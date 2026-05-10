@@ -50,6 +50,7 @@ def test_generate_sends_payload_and_logs_csv(monkeypatch, tmp_path: Path):
         model="llama3:8b",
         csv_path=tmp_path / "logs.csv",
         options=OllamaOptions(seed=7, temperature=0.4, top_k=5, stop="STOP"),
+        timeout_seconds=180,
     )
     client = OllamaClient(config=config)
 

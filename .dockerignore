@@ -1,0 +1,7 @@
+.pytest-temp
+.pytest_cache
+.tmp
+tmp
+__pycache__
+*.pyc
+

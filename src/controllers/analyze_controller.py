@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 import requests
 
-from ..application.services import KnowledgeGraphService
+from ..application.services import KnowledgeGraphService, RDFValidationError
 from ..domain.models import AnalyzeRequest
 
 
@@ -10,7 +10,10 @@ def create_analyze_blueprint(service: KnowledgeGraphService) -> Blueprint:
 
     @blueprint.route("/health", methods=["GET"])
     def health() -> tuple:
-        return jsonify({"status": "ok"}), 200
+        payload = {"status": "ok"}
+        if service.ollama_client:
+            payload["ollama"] = service.ollama_client.health_check()
+        return jsonify(payload), 200
 
     @blueprint.route("/analyze", methods=["POST"])
     def analyze() -> tuple:
@@ -21,6 +24,7 @@ def create_analyze_blueprint(service: KnowledgeGraphService) -> Blueprint:
 
         prompt_name = data.get("prompt_name")
         system_prompt_name = data.get("system_prompt_name")
+        max_rdf_attempts = data.get("max_rdf_attempts", 3)
 
         try:
             response = service.analyze(
@@ -28,12 +32,15 @@ def create_analyze_blueprint(service: KnowledgeGraphService) -> Blueprint:
                     text=text,
                     prompt_name=prompt_name,
                     system_prompt_name=system_prompt_name,
+                    max_rdf_attempts=max_rdf_attempts,
                 )
             )
         except FileNotFoundError as exc:
             return jsonify({"error": str(exc)}), 404
         except requests.RequestException as exc:
             return jsonify({"error": "Failed to generate response from model.", "details": str(exc)}), 502
+        except RDFValidationError as exc:
+            return jsonify({"error": "rdf parse errror", "attempts": exc.attempts, "details": exc.last_error}), 508
         except RuntimeError as exc:
             return jsonify({"error": str(exc)}), 502
         except ValueError as exc:

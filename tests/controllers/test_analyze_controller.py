@@ -33,11 +33,16 @@ class StubOllamaClient:
             model="llama3:8b",
             csv_path=Path("unused.csv"),
             options=OllamaOptions(),
+            timeout_seconds=180,
         )
 
     def generate(self, system_prompt: str, prompt: str, prompt_name: str | None = None, input_text: str | None = None):
         self.calls.append({"system": system_prompt, "prompt": prompt, "prompt_name": prompt_name, "input_text": input_text})
-        return {"model": "llama3:8b", "response": "ok", "done": True}
+        return {
+            "model": "llama3:8b",
+            "response": "<http://example.org/s> <http://example.org/p> <http://example.org/o> .",
+            "done": True,
+        }
 
 
 @pytest.fixture()
@@ -135,5 +140,37 @@ def test_analyze_includes_generation_payload():
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["text"] == "Some text"
-        assert data["rdf"] == "ok"
+        assert data["rdf"] == "<http://example.org/s> <http://example.org/p> <http://example.org/o> ."
         assert ollama.calls[0]["system"] == "System prompt content"
+
+
+def test_analyze_returns_508_when_rdf_is_invalid():
+    class InvalidOllamaClient(StubOllamaClient):
+        def generate(self, system_prompt: str, prompt: str, prompt_name: str | None = None, input_text: str | None = None):
+            self.calls.append({"system": system_prompt, "prompt": prompt, "prompt_name": prompt_name, "input_text": input_text})
+            return {"model": "llama3:8b", "response": "not rdf", "done": True}
+
+    repo = StubPromptRepo(prompt_text="Prompt content", system_prompt_text="System prompt content")
+    ollama = InvalidOllamaClient()
+    service = KnowledgeGraphService(
+        repo,
+        default_prompt="test_prompt.txt",
+        default_system_prompt="system_prompt.txt",
+        ollama_client=ollama,
+    )
+
+    from flask import Flask
+
+    app = Flask(__name__)
+    app.register_blueprint(create_analyze_blueprint(service))
+    app.config.update({"TESTING": True})
+
+    with app.test_client() as client:
+        payload = {"text": "Some text", "max_rdf_attempts": 2}
+        resp = client.post("/analyze", data=json.dumps(payload), content_type="application/json")
+
+        assert resp.status_code == 508
+        data = resp.get_json()
+        assert data["error"] == "rdf parse errror"
+        assert data["attempts"] == 2
+        assert len(ollama.calls) == 2

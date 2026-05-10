@@ -4,8 +4,9 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class AnalyzeRequest:
     text: str
-    prompt_name: str
+    prompt_name: str | None = None
     system_prompt_name: str | None = None
+    max_rdf_attempts: int = 3
 
 
 @dataclass(frozen=True)

@@ -13,7 +13,7 @@ def ollama_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     sample_response = {
         "model": "llama3:8b",
         "created_at": "2024-01-01T00:00:00Z",
-        "response": "Generated KG",
+        "response": "@prefix ex: <http://example.org/> .\nex:s ex:p ex:o .",
         "thinking": "analysis",
         "done": True,
         "done_reason": "stop",
@@ -82,15 +82,15 @@ def test_analyze_request_flow(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["text"] == "Integration text"
-    assert data["rdf"] == "Generated KG"
+    assert data["rdf"] == "@prefix ex: <http://example.org/> .\nex:s ex:p ex:o ."
 
     assert "Integration text" in capture["payload"]["prompt"]
 
     assert csv_path.exists()
-    rows = csv_path.read_text(encoding="utf-8").splitlines()
-    header, first = rows[0], rows[1]
+    csv_text = csv_path.read_text(encoding="utf-8")
+    header = csv_text.splitlines()[0]
     assert "rdf_valid" in header
-    assert "False" in first
+    assert "True" in csv_text
 
 
 def test_analyze_placeholder_is_replaced(ollama_mock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -120,4 +120,4 @@ def test_analyze_placeholder_is_replaced(ollama_mock, monkeypatch: pytest.Monkey
 
         assert resp.status_code == 200
         assert resp.get_json()["text"] == "XYZ"
-        assert resp.get_json()["rdf"] == "Generated KG"
+        assert resp.get_json()["rdf"] == "@prefix ex: <http://example.org/> .\nex:s ex:p ex:o ."

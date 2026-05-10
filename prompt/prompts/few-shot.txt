@@ -1,4 +1,8 @@
-You are going to receive a Text, transform it to a knowledge graph using RDF syntax.
+You are going to receive a Text. Transform it to a knowledge graph using RDF/Turtle syntax.
+Return only the RDF/Turtle output. Do not write explanations, notes, headings, or markdown.
+Keep the graph small and complete: at most 6 resources and at most 18 triples.
+Every subject block must end with a period.
+Literal labels must use exactly one pair of double quotes, never doubled quotes.
 
 Use the follow as prefixes:
 @prefix ex: <http://example.org/kg/> .
@@ -66,5 +70,5 @@ ex:radium a schema:ChemicalSubstance ;
 ex:paris a schema:Place ;
   rdfs:label "Paris" .
 
-Text: ${Text_TEXT}
+Text: ${USER_TEXT}
 RDF:
