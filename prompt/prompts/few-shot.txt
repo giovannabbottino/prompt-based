@@ -1,74 +1,76 @@
 You are going to receive a Text. Transform it to a knowledge graph using RDF/Turtle syntax.
 Return only the RDF/Turtle output. Do not write explanations, notes, headings, or markdown.
-Keep the graph small and complete: at most 6 resources and at most 18 triples.
 Every subject block must end with a period.
 Literal labels must use exactly one pair of double quotes, never doubled quotes.
+Use only the declared prefixes below. Do not use undeclared prefixes such as schema: or ex:.
+Use kg: resources, classes, and predicates with snake_case local names.
+Add a language tag to each rdfs:label literal.
 
-Use the follow as prefixes:
-@prefix ex: <http://example.org/kg/> .
-@prefix schema: <http://schema.org/> .
+Use the following prefixes:
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix wd: <http://www.wikidata.org/entity/> .
+@prefix kg: <https://example.org/wikidata-description/> .
 
 Some examples
 
 Text: Alan Turing worked at Bletchley Park during World War II.
 RDF:
-@prefix ex: <http://example.org/kg/> .
-@prefix schema: <http://schema.org/> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix wd: <http://www.wikidata.org/entity/> .
+@prefix kg: <https://example.org/wikidata-description/> .
 
-ex:alan_turing a schema:Person ;
-  rdfs:label "Alan Turing" ;
-  schema:worksFor ex:bletchley_park ;
-  schema:activeDuring ex:world_war_ii .
+kg:alan_turing a kg:Person ;
+  rdfs:label "Alan Turing"@en ;
+  kg:worked_at kg:bletchley_park ;
+  kg:active_during kg:world_war_ii .
 
-ex:bletchley_park a schema:Place ;
-  rdfs:label "Bletchley Park" .
+kg:bletchley_park a kg:Place ;
+  rdfs:label "Bletchley Park"@en .
 
-ex:world_war_ii a schema:Event ;
-  rdfs:label "World War II" .
+kg:world_war_ii a kg:Event ;
+  rdfs:label "World War II"@en .
 
 Text: A research lab released a multimodal AI model in 2024, focusing on multimodal reasoning.
 RDF:
-@prefix ex: <http://example.org/kg/> .
-@prefix schema: <http://schema.org/> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix wd: <http://www.wikidata.org/entity/> .
+@prefix kg: <https://example.org/wikidata-description/> .
 
-ex:research_lab a schema:Organization ;
-  rdfs:label "Research Lab" ;
-  schema:produced ex:multimodal_model .
+kg:research_lab a kg:Organization ;
+  rdfs:label "Research Lab"@en ;
+  kg:released kg:multimodal_model .
 
-ex:multimodal_model a schema:SoftwareApplication ;
-  rdfs:label "Multimodal Model" ;
-  schema:releaseDate "2024" ;
-  schema:about ex:multimodal_reasoning .
+kg:multimodal_model a kg:SoftwareApplication ;
+  rdfs:label "Multimodal Model"@en ;
+  kg:release_year "2024" ;
+  kg:focuses_on kg:multimodal_reasoning .
 
-ex:multimodal_reasoning a schema:Intangible ;
-  rdfs:label "multimodal reasoning" .
+kg:multimodal_reasoning a kg:Intangible ;
+  rdfs:label "multimodal reasoning"@en .
 
 Text: Marie Curie discovered radium with Pierre Curie in Paris.
 RDF:
-@prefix ex: <http://example.org/kg/> .
-@prefix schema: <http://schema.org/> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix wd: <http://www.wikidata.org/entity/> .
+@prefix kg: <https://example.org/wikidata-description/> .
 
-ex:marie_curie a schema:Person ;
-  rdfs:label "Marie Curie" ;
-  schema:colleague ex:pierre_curie ;
-  schema:location ex:paris ;
-  schema:discovererOf ex:radium .
+kg:marie_curie a kg:Person ;
+  rdfs:label "Marie Curie"@en ;
+  kg:collaborated_with kg:pierre_curie ;
+  kg:worked_in kg:paris ;
+  kg:discovered kg:radium .
 
-ex:pierre_curie a schema:Person ;
-  rdfs:label "Pierre Curie" ;
-  schema:colleague ex:marie_curie ;
-  schema:location ex:paris ;
-  schema:discovererOf ex:radium .
+kg:pierre_curie a kg:Person ;
+  rdfs:label "Pierre Curie"@en ;
+  kg:collaborated_with kg:marie_curie ;
+  kg:worked_in kg:paris ;
+  kg:discovered kg:radium .
 
-ex:radium a schema:ChemicalSubstance ;
-  rdfs:label "radium" .
+kg:radium a kg:ChemicalSubstance ;
+  rdfs:label "radium"@en .
 
-ex:paris a schema:Place ;
-  rdfs:label "Paris" .
+kg:paris a kg:Place ;
+  rdfs:label "Paris"@en .
 
 Text: ${USER_TEXT}
 RDF:
