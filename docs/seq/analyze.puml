@@ -1,4 +1,4 @@
-﻿@startuml
+@startuml
 actor User
 boundary ClientApp as Client
 
@@ -12,43 +12,59 @@ end box
 collections "Prompt files\n(prompt/)" as PromptFiles
 database "CSV log\n(OLLAMA_CSV_PATH)" as CSV
 boundary "Ollama /api/generate" as OA
+control "rdflib Graph.parse\n(Turtle validation)" as RDF
 
 User -> Client: Request analysis
-Client -> Controller ++: POST /analyze {text, prompt_name?, system_prompt_name?}
+Client -> Controller ++: POST /analyze {text, prompt_name?, system_prompt_name?, max_rdf_attempts?}
 note right of Controller
 payload example:
 {
   "text": "Alice knows Bob.",
   "prompt_name": "prompts/few-shot.txt",
-  "system_prompt_name": "system/knowledge_graph.txt"
+  "system_prompt_name": "system/knowledge_graph.txt",
+  "max_rdf_attempts": 3
 }
 end note
+
 Controller -> Controller: validate text present
-Controller -> Service ++: build AnalyzeRequest
+Controller -> Service ++: AnalyzeRequest(text, prompt names, max_rdf_attempts)
 
-Service -> Repo ++: load system prompt (default or override)
-Repo -> PromptFiles: read system prompt file
+Service -> Repo ++: load system prompt
+Repo -> PromptFiles: read system/knowledge_graph.txt
 Repo --> Service --: system prompt text
-Service -> Repo ++: load prompt template (default or override)
-Repo -> PromptFiles: read prompt template file
-Repo --> Service --: prompt template text
-Service -> Service: build message (${USER_TEXT} replace or chat-style append)
 
-Service -> OC ++: generate(system, prompt, prompt_name, input_text)
+Service -> Repo ++: load few-shot prompt
+Repo -> PromptFiles: read prompts/few-shot.txt
+Repo --> Service --: prompt template text
+
+Service -> Service: replace ${USER_TEXT} with input text
+
+Service -> OC ++: generate(system_prompt, prompt, prompt_name, input_text)
 note right of OC
-POST to Ollama with:
+POST to Ollama:
 - model: OLLAMA_MODEL
-- url: OLLAMA_API_URL/api/generate
-- options: OLLAMA_* (seed, temperature, top_k, top_p, min_p, stop, num_ctx, num_predict)
+- system: system prompt
+- prompt: few-shot prompt with input text
+- options: OLLAMA_* generation options
 - stream: false
 end note
-OC -> OA ++: POST /api/generate {model, system, prompt, options, stream:false}
-OA --> OC --: JSON payload (response, timings, done_reason)
 
-OC -> CSV ++: append row (prompt_name, input_text, response, rdf flags)
+OC -> OA ++: POST /api/generate
+OA --> OC --: JSON payload with response RDF
+
+OC -> CSV ++: append row with prompt, input, response, metrics
 CSV --> OC --: logged
 OC --> Service --: generation payload
-Service --> Controller --: AnalyzeResponse.to_dict()
-Controller --> Client --: 200 {prompt metadata, message_for_model, generation}
-Client --> User: Show result
+
+Service -> Service: extract RDF text and apply repair candidates
+Service -> RDF ++: parse(candidate, format="turtle")
+RDF --> Service --: valid Turtle
+
+Service -> Service: set generation["response"] to validated RDF
+Service --> Controller --: AnalyzeResponse
+
+Controller -> Controller: rdf_output = response.generation["response"]
+Controller --> Client --: 200 {"text": input_text, "rdf": rdf_output}
+Client --> User: Show RDF result
+
 @enduml

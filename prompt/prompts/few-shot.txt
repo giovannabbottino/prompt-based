@@ -5,6 +5,10 @@ Literal labels must use exactly one pair of double quotes, never doubled quotes.
 Use only the declared prefixes below. Do not use undeclared prefixes such as schema: or ex:.
 Use kg: resources, classes, and predicates with snake_case local names.
 Add a language tag to each rdfs:label literal.
+Every entity, concept, class, place, person, organization, event, and object that appears as a subject or object must have an rdfs:label.
+Prefer entity-to-entity triples over literal-only descriptions so SPARQL evaluation can traverse to labeled answers.
+For type or classification relationships, use kg:is.
+When possible, use this predicate vocabulary: kg:is, kg:of, kg:from, kg:in, kg:on, kg:to, kg:with, kg:has_part, kg:part_of, kg:located_in, kg:instance_of.
 
 Use the following prefixes:
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
