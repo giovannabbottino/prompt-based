@@ -3,6 +3,10 @@ Rules:
 - Emit triples using only the prefixes provided in the user prompt. Prefer stable `kg:` local names in snake_case.
 - Capture directed relations as predicates between subjects and objects.
 - Include labels for entities using `rdfs:label` with their surface form and a language tag, for example `"Alan Turing"@en`.
+- Include `rdfs:label` for every entity, concept, class, place, person, organization, event, and object that appears as a subject or object.
+- Prefer entity-to-entity triples over literal-only descriptions so downstream SPARQL can traverse from a subject label to an answer label.
+- For type/classification statements, prefer `kg:is`.
+- Prefer this small predicate vocabulary when it fits the text: `kg:is`, `kg:of`, `kg:from`, `kg:in`, `kg:on`, `kg:to`, `kg:with`, `kg:has_part`, `kg:part_of`, `kg:located_in`, `kg:instance_of`.
 - Every subject block must end with `.`. Do not stop in the middle of a block.
 - Return only valid Turtle. Do not include markdown, headings, notes, explanations, or English sentences outside RDF triples.
 - Every non-empty output line must be Turtle syntax: prefix declaration, subject/predicate/object line, continuation line, or terminator.

@@ -1,58 +1,120 @@
-﻿#  How to run
+# How to run
 
 ## Environment variables
-Defaults from `.env`:
+
+The application loads `.env` when running locally and also accepts regular environment variables. Docker Compose sets the production-like defaults for this service.
+
 - `DEFAULT_PROMPT_NAME=prompts/few-shot.txt`
 - `DEFAULT_SYSTEM_PROMPT_NAME=system/knowledge_graph.txt`
 - `OLLAMA_API_URL=http://localhost:11434`
 - `OLLAMA_MODEL=llama3:8b`
 - `OLLAMA_CSV_PATH=data/ollama_responses.csv`
-- Generation options (all optional; blanks ignored): `OLLAMA_SEED`, `OLLAMA_TEMPERATURE`, `OLLAMA_TOP_K`, `OLLAMA_TOP_P`, `OLLAMA_MIN_P`, `OLLAMA_STOP`, `OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT`.
-
+- `OLLAMA_TIMEOUT_SECONDS=180`
+- Generation options, all optional and ignored when blank: `OLLAMA_SEED`, `OLLAMA_TEMPERATURE`, `OLLAMA_TOP_K`, `OLLAMA_TOP_P`, `OLLAMA_MIN_P`, `OLLAMA_STOP`, `OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT`.
 
 ## Requirements
+
 - Python >=3.10
+- Ollama with the configured model installed
 
-## Setup
+## Run with Docker Compose
 
-### 1. Install Python Dependencies
+From the repository root:
 
-#### Linux / macOS (bash)
+```powershell
+docker compose up --build -d prompt-based
+```
+
+On first run, pull the configured model into the Ollama container:
+
+```powershell
+docker exec -it kg-ollama ollama pull llama3:8b
+```
+
+Check the service:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:5000/health"
+```
+
+Analyze text:
+
+```powershell
+$body = @{
+  text = "Mango is a tropical fruit."
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:5000/analyze" `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+Generated Ollama responses are logged to `prompt-based/data/ollama_responses.csv` because Docker Compose mounts `./prompt-based/data` to `/app/data`.
+
+## Run locally
+
+Run commands from `prompt-based/`.
+
+### 1. Install Python dependencies
+
+Linux / macOS:
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-#### Windows (PowerShell)
+Windows PowerShell:
+
 ```powershell
 python -m venv .venv
-.\\.venv\\Scripts\\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-### 2. Install and Configure Ollama
+### 2. Install and configure Ollama
 
-#### Install Ollama:
-- **Windows/Mac**: Download from [https://ollama.ai](https://ollama.ai)
+Windows/Mac: download from [https://ollama.ai](https://ollama.ai).
 
-#### Download model:
+Download the model:
+
 ```bash
 ollama pull llama3:8b
 ```
 
-#### Run model
-```
-ollama run llama3:8b
-```
+Start Ollama if it is not already running:
 
-#### Verify Ollama is running:
 ```bash
 ollama serve
 ```
 
-## Running the API
+### 3. Configure local defaults
+
+Create a local `.env` file when you want to override defaults:
+
+```text
+DEFAULT_PROMPT_NAME=prompts/few-shot.txt
+DEFAULT_SYSTEM_PROMPT_NAME=system/knowledge_graph.txt
+OLLAMA_API_URL=http://localhost:11434
+OLLAMA_MODEL=llama3:8b
+OLLAMA_CSV_PATH=data/ollama_responses.csv
+OLLAMA_TIMEOUT_SECONDS=180
+OLLAMA_NUM_PREDICT=768
+```
+
+### 4. Run the API
+
 ```bash
 python -m src.app
 ```
+
 The service listens on `http://127.0.0.1:5000`.
+
+## Troubleshooting
+
+- `missing_model` in `/health`: run `ollama pull llama3:8b`.
+- `Failed to generate response from model`: check that Ollama is running and `OLLAMA_API_URL` points to it.
+- `rdf parse errror`: the model did not return valid Turtle after the configured attempts. Try a smaller input, a stricter prompt, or a higher `OLLAMA_NUM_PREDICT`.
