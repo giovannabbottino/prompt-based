@@ -9,8 +9,8 @@ class PromptRepository:
 
     def __init__(self, prompt_dir: Path | None = None) -> None:
         # Default to repository root / prompt directory
-        base_dir = Path(__file__).resolve().parents[2]
-        self.prompt_dir = prompt_dir or (base_dir / "prompt")
+        base_dir = Path(__file__).resolve().parents[3]
+        self.prompt_dir = (prompt_dir or (base_dir / "prompt")).resolve()
 
     def load_prompt(self, prompt_name: str) -> str:
         prompt_path = (self.prompt_dir / prompt_name).resolve()

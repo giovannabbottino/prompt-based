@@ -7,7 +7,8 @@ Small Flask API that accepts text, combines it with prompt templates, asks Ollam
 ![Process Flow](docs/figures/process.jpg)
 
 ## Project Layout
-- `src/` - Flask API with controller, application, domain, and infrastructure layers.
+- `src/kg_construction/` - installable Python package using the standard `src` layout,
+  with controller, application, domain, and infrastructure layers.
 - `prompt/system/` - System prompts that define LLM behavior and output constraints.
 - `prompt/prompts/` - User prompt templates. The default template includes the `${USER_TEXT}` placeholder.
 - `docs/` - Endpoint, run, test, and sequence documentation.
@@ -52,6 +53,13 @@ Success response:
 See [docs/analyze.md](docs/analyze.md) for the full endpoint contract.
 
 See [docs/prompt.md](docs/prompt.md) for an explanation of the system prompt, few-shot prompt, placeholders, prefixes, and prompt editing guidelines.
+
+## Development quality checks
+
+Install the development dependencies with `python -m pip install -r requirements-dev.txt`,
+then run `python -m ruff format --check .`, `python -m ruff check .`,
+`python -m pyright`, and `python -m pytest`. GitHub Actions runs the same checks on pushes
+and pull requests with Python 3.10 and 3.13.
 
 ## LLM Configuration
 

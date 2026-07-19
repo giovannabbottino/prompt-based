@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from src.app import create_app
-from src.infrastructure import prompt_repository
+from kg_construction.app import create_app
+from kg_construction.infrastructure import prompt_repository
 
 
 @pytest.fixture()
@@ -41,7 +41,7 @@ def ollama_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
     csv_path = tmp_path / "ollama.csv"
     monkeypatch.setenv("OLLAMA_CSV_PATH", str(csv_path))
-    monkeypatch.setattr("src.infrastructure.ollama_client.requests.post", fake_post)
+    monkeypatch.setattr("kg_construction.infrastructure.ollama_client.requests.post", fake_post)
 
     return captured, sample_response, csv_path
 
@@ -76,7 +76,11 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ollama_mock):
 
 def test_analyze_request_flow(client):
     client, capture, sample_response, csv_path = client
-    payload = {"text": "Integration text", "prompt_name": "test_prompt.txt", "system_prompt_name": "system_prompt.txt"}
+    payload = {
+        "text": "Integration text",
+        "prompt_name": "test_prompt.txt",
+        "system_prompt_name": "system_prompt.txt",
+    }
     resp = client.post("/analyze", data=json.dumps(payload), content_type="application/json")
 
     assert resp.status_code == 200
@@ -93,7 +97,9 @@ def test_analyze_request_flow(client):
     assert "True" in csv_text
 
 
-def test_analyze_placeholder_is_replaced(ollama_mock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_analyze_placeholder_is_replaced(
+    ollama_mock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
     captured, sample_response, csv_path = ollama_mock
     prompt_dir = tmp_path / "prompt2"
     prompt_dir.mkdir()
@@ -115,7 +121,11 @@ def test_analyze_placeholder_is_replaced(ollama_mock, monkeypatch: pytest.Monkey
     app = create_app()
     app.config.update({"TESTING": True})
     with app.test_client() as client2:
-        payload = {"text": "XYZ", "prompt_name": "test_prompt.txt", "system_prompt_name": "system_prompt.txt"}
+        payload = {
+            "text": "XYZ",
+            "prompt_name": "test_prompt.txt",
+            "system_prompt_name": "system_prompt.txt",
+        }
         resp = client2.post("/analyze", data=json.dumps(payload), content_type="application/json")
 
         assert resp.status_code == 200

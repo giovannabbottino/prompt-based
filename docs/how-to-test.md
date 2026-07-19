@@ -9,6 +9,7 @@ Tests are organized by scope:
 Run commands from `prompt-based/`.
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
 
@@ -28,6 +29,7 @@ python -m pytest tests/integration/test_app_requests.py
 
 ## Notes
 
-- Tests use the `pythonpath = .` setting from `pytest.ini`, so run them from the module root.
+- The project uses the standard `src` package layout and is installed in editable mode by
+  `requirements-dev.txt`.
 - Pytest writes temporary files under `.pytest-runtime` through the configured `--basetemp`.
 - Integration tests mock external generation calls; Ollama does not need to be running for the test suite.

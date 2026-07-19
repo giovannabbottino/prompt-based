@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -16,9 +17,9 @@ class AnalyzeResponse:
     prompt: str
     input_text: str
     message_for_model: str
-    generation: dict | None = None
+    generation: dict[str, Any] | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "prompt_name": self.prompt_name,
             "system_prompt_name": self.system_prompt_name,

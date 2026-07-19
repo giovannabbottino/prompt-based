@@ -64,7 +64,7 @@ Linux / macOS:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 Windows PowerShell:
@@ -72,7 +72,7 @@ Windows PowerShell:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ### 2. Install and configure Ollama
@@ -108,7 +108,7 @@ OLLAMA_NUM_PREDICT=768
 ### 4. Run the API
 
 ```bash
-python -m src.app
+python -m kg_construction.app
 ```
 
 The service listens on `http://127.0.0.1:5000`.
@@ -117,4 +117,4 @@ The service listens on `http://127.0.0.1:5000`.
 
 - `missing_model` in `/health`: run `ollama pull llama3:8b`.
 - `Failed to generate response from model`: check that Ollama is running and `OLLAMA_API_URL` points to it.
-- `rdf parse errror`: the model did not return valid Turtle after the configured attempts. Try a smaller input, a stricter prompt, or a higher `OLLAMA_NUM_PREDICT`.
+- `RDF parsing failed`: the model did not return valid Turtle after the configured attempts. Try a smaller input, a stricter prompt, or a higher `OLLAMA_NUM_PREDICT`.
