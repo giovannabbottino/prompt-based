@@ -42,7 +42,7 @@ def _float_from_env(name: str) -> float | None:
 
 def _is_likely_turtle(text: str) -> bool:
     """Lightweight heuristic to flag RDF/Turtle-like responses."""
-    if not text or not isinstance(text, str):
+    if not text:
         return False
     return "@prefix" in text and (";" in text or "." in text)
 
@@ -88,10 +88,13 @@ class OllamaClientConfig:
     timeout_seconds: int
 
     @classmethod
-    def from_env(cls) -> "OllamaClientConfig":
-        url = _env_value("OLLAMA_API_URL", "http://localhost:11434")
-        model = _env_value("OLLAMA_MODEL", "llama3:8b")
-        csv_path = Path(_env_value("OLLAMA_CSV_PATH", "data/ollama_responses.csv"))
+    def from_env(cls) -> OllamaClientConfig:
+        url = _env_value("OLLAMA_API_URL", "http://localhost:11434") or "http://localhost:11434"
+        model = _env_value("OLLAMA_MODEL", "llama3:8b") or "llama3:8b"
+        csv_path = Path(
+            _env_value("OLLAMA_CSV_PATH", "data/ollama_responses.csv")
+            or "data/ollama_responses.csv"
+        )
         options = OllamaOptions(
             seed=_int_from_env("OLLAMA_SEED"),
             temperature=_float_from_env("OLLAMA_TEMPERATURE"),
@@ -164,9 +167,7 @@ class OllamaClient:
 
         models = data.get("models", [])
         model_names = {
-            model.get("name") or model.get("model")
-            for model in models
-            if isinstance(model, dict)
+            model.get("name") or model.get("model") for model in models if isinstance(model, dict)
         }
         if self.config.model not in model_names:
             return {
@@ -191,7 +192,9 @@ class OllamaClient:
         except ValueError as exc:  # pragma: no cover - defensive guard
             raise RuntimeError("Invalid JSON response from generation API") from exc
 
-    def _log_to_csv(self, data: dict[str, Any], prompt_name: str | None, input_text: str | None) -> None:
+    def _log_to_csv(
+        self, data: dict[str, Any], prompt_name: str | None, input_text: str | None
+    ) -> None:
         csv_path = self.config.csv_path
         csv_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -215,7 +218,7 @@ class OllamaClient:
             "rdf_note",
         ]
         write_header = not csv_path.exists()
-        response_text = data.get("response")
+        response_text = str(data.get("response") or "")
         rdf_valid = _is_likely_turtle(response_text)
         rdf_note = "" if rdf_valid else "Response not recognized as RDF/Turtle."
         with csv_path.open("a", encoding="utf-8", newline="") as csv_file:

@@ -1,11 +1,26 @@
 import re
-from typing import Optional
+from collections.abc import Iterator
+from typing import Any, Protocol, runtime_checkable
 
 from rdflib import Graph
 
 from ..domain.models import AnalyzeRequest, AnalyzeResponse
-from ..infrastructure.ollama_client import OllamaClient
 from ..infrastructure.prompt_repository import PromptRepository
+
+
+class GenerationClient(Protocol):
+    def generate(
+        self,
+        system_prompt: str,
+        prompt: str,
+        prompt_name: str | None = None,
+        input_text: str | None = None,
+    ) -> dict[str, Any]: ...
+
+
+@runtime_checkable
+class HealthClient(Protocol):
+    def health_check(self) -> dict[str, Any]: ...
 
 
 class RDFValidationError(RuntimeError):
@@ -21,7 +36,7 @@ class KnowledgeGraphService:
         prompt_repository: PromptRepository,
         default_prompt: str,
         default_system_prompt: str,
-        ollama_client: Optional[OllamaClient] = None,
+        ollama_client: GenerationClient | None = None,
     ) -> None:
         self.prompt_repository = prompt_repository
         self.default_prompt = default_prompt
@@ -37,7 +52,9 @@ class KnowledgeGraphService:
 
         # Fill supported text placeholders; otherwise append user text in a chat-style turn.
         if "${USER_TEXT}" in prompt_text or "${Text_TEXT}" in prompt_text:
-            message = prompt_text.replace("${USER_TEXT}", request.text).replace("${Text_TEXT}", request.text)
+            message = prompt_text.replace("${USER_TEXT}", request.text).replace(
+                "${Text_TEXT}", request.text
+            )
         else:
             message = f"{prompt_text}\n\nUser: {request.text}\nAssistant:"
 
@@ -66,6 +83,11 @@ class KnowledgeGraphService:
     def get_default_system_prompt(self) -> str:
         return self.default_system_prompt
 
+    def health_check(self) -> dict[str, Any] | None:
+        if isinstance(self.ollama_client, HealthClient):
+            return self.ollama_client.health_check()
+        return None
+
     def _generate_valid_rdf(
         self,
         system_prompt: str,
@@ -73,13 +95,17 @@ class KnowledgeGraphService:
         prompt_name: str,
         input_text: str,
         max_attempts: int,
-    ) -> dict:
+    ) -> dict[str, Any]:
+        client = self.ollama_client
+        if client is None:
+            raise RuntimeError("A generation client is required to generate RDF.")
+
         attempts = max(1, min(int(max_attempts or 3), 3))
         current_prompt = prompt
-        last_error = None
+        last_error: str | None = None
 
         for attempt in range(1, attempts + 1):
-            generation = self.ollama_client.generate(
+            generation = client.generate(
                 system_prompt=system_prompt,
                 prompt=current_prompt,
                 prompt_name=prompt_name,
@@ -99,10 +125,12 @@ class KnowledgeGraphService:
 
             if attempt == attempts:
                 break
-            current_prompt = self._build_retry_prompt(prompt, rdf_text, last_error or "Invalid Turtle RDF.")
+            current_prompt = self._build_retry_prompt(
+                prompt, rdf_text, last_error or "Invalid Turtle RDF."
+            )
 
         raise RDFValidationError(
-            "rdf parse errror",
+            "RDF parsing failed.",
             attempts=attempts,
             last_error=last_error,
         )
@@ -131,14 +159,14 @@ class KnowledgeGraphService:
         return text
 
     @classmethod
-    def _rdf_repair_candidates(cls, rdf_text: str):
+    def _rdf_repair_candidates(cls, rdf_text: str) -> Iterator[tuple[str, str]]:
         raw = (rdf_text or "").strip().replace("\r\n", "\n").replace("\r", "\n")
         raw = raw.replace("\u201c", '"').replace("\u201d", '"').replace("\u2019", "'")
         raw = re.sub(r'""([^"\n]+)""', r'"\1"', raw)
 
-        seen = set()
+        seen: set[str] = set()
 
-        def emit(method: str, value: str):
+        def emit(method: str, value: str) -> Iterator[tuple[str, str]]:
             value = (value or "").strip()
             if not value or value in seen:
                 return
@@ -156,7 +184,9 @@ class KnowledgeGraphService:
             if line.strip().endswith("."):
                 last_complete_line = idx
         if last_complete_line is not None:
-            yield from emit("keep_through_last_complete_statement", "\n".join(lines[: last_complete_line + 1]))
+            yield from emit(
+                "keep_through_last_complete_statement", "\n".join(lines[: last_complete_line + 1])
+            )
 
         blocks = re.split(r"\n\s*\n", raw)
         while len(blocks) > 1:
@@ -174,6 +204,7 @@ class KnowledgeGraphService:
             f"{original_prompt}\n\n"
             "The previous answer was not valid Turtle RDF when parsed with rdflib Graph.parse.\n"
             f"Parser error:\n{error}\n\n"
-            "Return only corrected valid Turtle RDF. Do not include markdown fences, comments, or explanations.\n"
+            "Return only corrected valid Turtle RDF. Do not include markdown fences, "
+            "comments, or explanations.\n"
             f"Previous invalid RDF:\n{previous}"
         )
