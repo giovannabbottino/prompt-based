@@ -3,7 +3,10 @@ Return only the RDF/Turtle output. Do not write explanations, notes, headings, o
 Every subject block must end with a period.
 Literal labels must use exactly one pair of double quotes, never doubled quotes.
 Use only the declared prefixes below. Do not use undeclared prefixes such as schema: or ex:.
-Use kg: resources, classes, and predicates with snake_case local names.
+Use the exact Wikidata resource `wd:Q...` for a recognizable real-world entity when you know its QID confidently. The QID must appear as the subject or object of relationship triples, not as a label-only literal.
+Do not replace a known Wikidata entity with a generated `kg:` resource. Use `kg:` with a snake_case local name only for concepts that have no confidently known QID; never invent a QID.
+Whether the resource is `wd:` or `kg:`, use the exact human-readable surface form from the input Text as its rdfs:label. Do not replace the text wording with a canonical or normalized name.
+Use kg: resources, classes, and predicates with snake_case local names only when no confident Wikidata QID is available.
 Add a language tag to each rdfs:label literal.
 Every entity, concept, class, place, person, organization, event, and object that appears as a subject or object must have an rdfs:label.
 Prefer entity-to-entity triples over literal-only descriptions so SPARQL evaluation can traverse to labeled answers.
@@ -23,15 +26,15 @@ RDF:
 @prefix wd: <http://www.wikidata.org/entity/> .
 @prefix kg: <https://example.org/wikidata-description/> .
 
-kg:alan_turing a kg:Person ;
+wd:Q7251 a kg:Person ;
   rdfs:label "Alan Turing"@en ;
-  kg:worked_at kg:bletchley_park ;
-  kg:active_during kg:world_war_ii .
+  kg:worked_at wd:Q208834 ;
+  kg:active_during wd:Q362 .
 
-kg:bletchley_park a kg:Place ;
+wd:Q208834 a kg:Place ;
   rdfs:label "Bletchley Park"@en .
 
-kg:world_war_ii a kg:Event ;
+wd:Q362 a kg:Event ;
   rdfs:label "World War II"@en .
 
 Text: A research lab released a multimodal AI model in 2024, focusing on multimodal reasoning.
@@ -58,22 +61,22 @@ RDF:
 @prefix wd: <http://www.wikidata.org/entity/> .
 @prefix kg: <https://example.org/wikidata-description/> .
 
-kg:marie_curie a kg:Person ;
+wd:Q7186 a kg:Person ;
   rdfs:label "Marie Curie"@en ;
-  kg:collaborated_with kg:pierre_curie ;
-  kg:worked_in kg:paris ;
-  kg:discovered kg:radium .
+  kg:collaborated_with wd:Q37463 ;
+  kg:worked_in wd:Q90 ;
+  kg:discovered wd:Q1128 .
 
-kg:pierre_curie a kg:Person ;
+wd:Q37463 a kg:Person ;
   rdfs:label "Pierre Curie"@en ;
-  kg:collaborated_with kg:marie_curie ;
-  kg:worked_in kg:paris ;
-  kg:discovered kg:radium .
+  kg:collaborated_with wd:Q7186 ;
+  kg:worked_in wd:Q90 ;
+  kg:discovered wd:Q1128 .
 
-kg:radium a kg:ChemicalSubstance ;
+wd:Q1128 a kg:ChemicalSubstance ;
   rdfs:label "radium"@en .
 
-kg:paris a kg:Place ;
+wd:Q90 a kg:Place ;
   rdfs:label "Paris"@en .
 
 Text: ${USER_TEXT}
