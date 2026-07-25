@@ -8,6 +8,10 @@ def test_few_shot_prompt_requires_wikidata_ids_and_text_labels():
     assert "The QID must appear as the subject or object" in prompt
     assert "never invent a QID" in prompt
     assert "exact human-readable surface form from the input Text" in prompt
+    assert "Prefix declarations without relationship triples are not a valid answer" in prompt
+    assert "Cover every distinct entity or sense" in prompt
+    assert "additional rdfs:label on the same subject" in prompt
+    assert " a kg:" not in prompt
     assert "wd:Q7251" in prompt
     assert "wd:Q7186" in prompt
 

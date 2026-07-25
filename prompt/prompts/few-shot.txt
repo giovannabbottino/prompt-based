@@ -1,15 +1,24 @@
 You are going to receive a Text. Transform it to a knowledge graph using RDF/Turtle syntax.
 Return only the RDF/Turtle output. Do not write explanations, notes, headings, or markdown.
 Every subject block must end with a period.
+Prefix declarations without relationship triples are not a valid answer.
+Cover every distinct entity or sense described in the complete input Text; do not stop after the first sentence or first sense.
+For every main entity, emit its stated classifications and the directly related entities named in the Text.
+When the same name refers to different senses, create a distinct subject for each sense and give each subject the repeated surface name as an rdfs:label.
+When the Text says an entity is "known as", "better known as", or has a trade name, add that alias as an additional rdfs:label on the same subject; do not create a disconnected alias node.
 Literal labels must use exactly one pair of double quotes, never doubled quotes.
 Use only the declared prefixes below. Do not use undeclared prefixes such as schema: or ex:.
+Every predicate must be followed by an object. Never emit a predicate by itself.
+Separate multiple objects of one predicate with commas. Never place two objects next to each other without a comma, and never append `true` after another object.
 Use the exact Wikidata resource `wd:Q...` for a recognizable real-world entity when you know its QID confidently. The QID must appear as the subject or object of relationship triples, not as a label-only literal.
+Never emit placeholders or malformed Wikidata IDs such as `wd:Q?`, and never encode a number as a Wikidata ID. When the QID is unknown, use a labeled `kg:` resource.
 Do not replace a known Wikidata entity with a generated `kg:` resource. Use `kg:` with a snake_case local name only for concepts that have no confidently known QID; never invent a QID.
 Whether the resource is `wd:` or `kg:`, use the exact human-readable surface form from the input Text as its rdfs:label. Do not replace the text wording with a canonical or normalized name.
 Use kg: resources, classes, and predicates with snake_case local names only when no confident Wikidata QID is available.
 Add a language tag to each rdfs:label literal.
 Every entity, concept, class, place, person, organization, event, and object that appears as a subject or object must have an rdfs:label.
 Prefer entity-to-entity triples over literal-only descriptions so SPARQL evaluation can traverse to labeled answers.
+Preserve predicate meaning with concise snake_case names derived from the text, such as `kg:known_for`, `kg:founded_by`, `kg:headquartered_in`, and `kg:built_for`.
 For type or classification relationships, use kg:is.
 When possible, use this predicate vocabulary: kg:is, kg:of, kg:from, kg:in, kg:on, kg:to, kg:with, kg:has_part, kg:part_of, kg:located_in, kg:instance_of.
 
@@ -17,6 +26,7 @@ Use the following prefixes:
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix wd: <http://www.wikidata.org/entity/> .
 @prefix kg: <https://example.org/wikidata-description/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 Some examples
 
@@ -26,16 +36,13 @@ RDF:
 @prefix wd: <http://www.wikidata.org/entity/> .
 @prefix kg: <https://example.org/wikidata-description/> .
 
-wd:Q7251 a kg:Person ;
-  rdfs:label "Alan Turing"@en ;
+wd:Q7251 rdfs:label "Alan Turing"@en ;
   kg:worked_at wd:Q208834 ;
   kg:active_during wd:Q362 .
 
-wd:Q208834 a kg:Place ;
-  rdfs:label "Bletchley Park"@en .
+wd:Q208834 rdfs:label "Bletchley Park"@en .
 
-wd:Q362 a kg:Event ;
-  rdfs:label "World War II"@en .
+wd:Q362 rdfs:label "World War II"@en .
 
 Text: A research lab released a multimodal AI model in 2024, focusing on multimodal reasoning.
 RDF:
@@ -43,17 +50,14 @@ RDF:
 @prefix wd: <http://www.wikidata.org/entity/> .
 @prefix kg: <https://example.org/wikidata-description/> .
 
-kg:research_lab a kg:Organization ;
-  rdfs:label "Research Lab"@en ;
+kg:research_lab rdfs:label "Research Lab"@en ;
   kg:released kg:multimodal_model .
 
-kg:multimodal_model a kg:SoftwareApplication ;
-  rdfs:label "Multimodal Model"@en ;
+kg:multimodal_model rdfs:label "Multimodal Model"@en ;
   kg:release_year "2024" ;
   kg:focuses_on kg:multimodal_reasoning .
 
-kg:multimodal_reasoning a kg:Intangible ;
-  rdfs:label "multimodal reasoning"@en .
+kg:multimodal_reasoning rdfs:label "multimodal reasoning"@en .
 
 Text: Marie Curie discovered radium with Pierre Curie in Paris.
 RDF:
@@ -61,23 +65,19 @@ RDF:
 @prefix wd: <http://www.wikidata.org/entity/> .
 @prefix kg: <https://example.org/wikidata-description/> .
 
-wd:Q7186 a kg:Person ;
-  rdfs:label "Marie Curie"@en ;
+wd:Q7186 rdfs:label "Marie Curie"@en ;
   kg:collaborated_with wd:Q37463 ;
   kg:worked_in wd:Q90 ;
   kg:discovered wd:Q1128 .
 
-wd:Q37463 a kg:Person ;
-  rdfs:label "Pierre Curie"@en ;
+wd:Q37463 rdfs:label "Pierre Curie"@en ;
   kg:collaborated_with wd:Q7186 ;
   kg:worked_in wd:Q90 ;
   kg:discovered wd:Q1128 .
 
-wd:Q1128 a kg:ChemicalSubstance ;
-  rdfs:label "radium"@en .
+wd:Q1128 rdfs:label "radium"@en .
 
-wd:Q90 a kg:Place ;
-  rdfs:label "Paris"@en .
+wd:Q90 rdfs:label "Paris"@en .
 
 Text: ${USER_TEXT}
 RDF:
