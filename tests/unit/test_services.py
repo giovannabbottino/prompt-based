@@ -134,8 +134,10 @@ def test_analyze_retries_when_rdf_has_only_prefixes():
         )
     )
 
-    assert response.generation["rdf_validation_attempts"] == 2
-    assert "kg:mango kg:is kg:fruit" in response.generation["response"]
+    generation = response.generation
+    assert generation is not None
+    assert generation["rdf_validation_attempts"] == 2
+    assert "kg:mango kg:is kg:fruit" in generation["response"]
 
 
 def test_analyze_repairs_doubled_literal_quotes():
@@ -241,8 +243,11 @@ def test_analyze_retries_instead_of_dropping_complete_invalid_blocks():
 
     response = service.analyze(AnalyzeRequest(text="Two senses.", max_rdf_attempts=2))
 
-    assert "kg:second" in response.generation["response"]
-    assert response.generation["rdf_validation_attempts"] == 2
+    generation = response.generation
+    assert generation is not None
+    assert "kg:second" in generation["response"]
+    assert generation["rdf_validation_attempts"] == 2
+
 
 def test_analyze_adds_missing_xsd_prefix_without_retry():
     class StubOllamaClient:
@@ -263,8 +268,10 @@ def test_analyze_adds_missing_xsd_prefix_without_retry():
 
     response = service.analyze(AnalyzeRequest(text="Mustang", max_rdf_attempts=1))
 
-    assert "@prefix xsd:" in response.generation["response"]
-    assert response.generation["rdf_repair_method"] == "normalize_common_turtle_errors"
+    generation = response.generation
+    assert generation is not None
+    assert "@prefix xsd:" in generation["response"]
+    assert generation["rdf_repair_method"] == "normalize_common_turtle_errors"
 
 
 def test_analyze_replaces_invalid_wikidata_placeholder_and_stray_dot():
@@ -289,9 +296,11 @@ def test_analyze_replaces_invalid_wikidata_placeholder_and_stray_dot():
 
     response = service.analyze(AnalyzeRequest(text="Date", max_rdf_attempts=1))
 
-    assert "wd:Q?" not in response.generation["response"]
-    assert "kg:calendar_date" in response.generation["response"]
-    assert response.generation["rdf_repair_method"] == "normalize_common_turtle_errors"
+    generation = response.generation
+    assert generation is not None
+    assert "wd:Q?" not in generation["response"]
+    assert "kg:calendar_date" in generation["response"]
+    assert generation["rdf_repair_method"] == "normalize_common_turtle_errors"
 
 
 def test_analyze_salvages_valid_clauses_from_invalid_subject_block():
@@ -317,9 +326,10 @@ def test_analyze_salvages_valid_clauses_from_invalid_subject_block():
 
     response = service.analyze(AnalyzeRequest(text="Bank", max_rdf_attempts=1))
 
-    rdf = response.generation["response"]
+    generation = response.generation
+    assert generation is not None
+    rdf = generation["response"]
     assert "financial_institution" in rdf
     assert "accepts_deposits" not in rdf
     assert "makes_loans" not in rdf
-    assert response.generation["rdf_repair_method"] == "salvage_parseable_statements"
-
+    assert generation["rdf_repair_method"] == "salvage_parseable_statements"
