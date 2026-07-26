@@ -219,9 +219,7 @@ class KnowledgeGraphService:
         if re.search(r"\bxsd:", text) and not re.search(
             r"(?im)^\s*(?:@prefix|prefix)\s+xsd:", text
         ):
-            text = (
-                "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n" + text
-            )
+            text = "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n" + text
         return text.strip()
 
     @classmethod
@@ -232,11 +230,7 @@ class KnowledgeGraphService:
 
     @staticmethod
     def _safe_local_name(label: str) -> str:
-        normalized = (
-            unicodedata.normalize("NFKD", label)
-            .encode("ascii", "ignore")
-            .decode()
-        )
+        normalized = unicodedata.normalize("NFKD", label).encode("ascii", "ignore").decode()
         local_name = re.sub(r"[^A-Za-z0-9]+", "_", normalized).strip("_").lower()
         if not local_name:
             local_name = "unknown_entity"
@@ -289,15 +283,11 @@ class KnowledgeGraphService:
                 *(f"{subject} {clause}" for clause in clauses[1:]),
             ]
             for clause_statement in clause_statements:
-                parsed = cls._try_parse_statement(
-                    prefix_text, clause_statement + " ."
-                )
+                parsed = cls._try_parse_statement(prefix_text, clause_statement + " .")
                 if parsed is None and '"' not in clause_statement:
                     terms = clause_statement.split()
                     if len(terms) > 3:
-                        parsed = cls._try_parse_statement(
-                            prefix_text, " ".join(terms[:3]) + " ."
-                        )
+                        parsed = cls._try_parse_statement(prefix_text, " ".join(terms[:3]) + " .")
                 if parsed is not None:
                     graph += parsed
 
@@ -308,9 +298,7 @@ class KnowledgeGraphService:
     @staticmethod
     def _try_parse_statement(prefix_text: str, statement: str) -> Graph | None:
         try:
-            return Graph().parse(
-                data=f"{prefix_text}\n{statement}", format="turtle"
-            )
+            return Graph().parse(data=f"{prefix_text}\n{statement}", format="turtle")
         except Exception:
             return None
 
