@@ -79,12 +79,6 @@ class KnowledgeGraphService:
             generation=generation_response,
         )
 
-    def get_default_prompt(self) -> str:
-        return self.default_prompt
-
-    def get_default_system_prompt(self) -> str:
-        return self.default_system_prompt
-
     def health_check(self) -> dict[str, Any] | None:
         if isinstance(self.ollama_client, HealthClient):
             return self.ollama_client.health_check()
