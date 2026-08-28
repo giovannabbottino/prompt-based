@@ -56,7 +56,7 @@ OC -> CSV ++: append row with prompt, input, response, metrics
 CSV --> OC --: logged
 OC --> Service --: generation payload
 
-Service -> Service: extract RDF text and apply repair candidates
+Service -> Service: extract RDF text without local repair
 Service -> RDF ++: parse(candidate, format="turtle")
 RDF --> Service --: valid Turtle
 

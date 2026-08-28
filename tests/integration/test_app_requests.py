@@ -11,7 +11,7 @@ from kg_construction.infrastructure import prompt_repository
 def ollama_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     captured = {}
     sample_response = {
-        "model": "llama3:8b",
+        "model": "llama3.1:8b",
         "created_at": "2024-01-01T00:00:00Z",
         "response": "@prefix ex: <http://example.org/> .\nex:s ex:p ex:o .",
         "thinking": "analysis",
@@ -65,7 +65,7 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ollama_mock):
     monkeypatch.setenv("DEFAULT_PROMPT_NAME", "test_prompt.txt")
     monkeypatch.setenv("DEFAULT_SYSTEM_PROMPT_NAME", "system_prompt.txt")
     monkeypatch.setenv("OLLAMA_API_URL", "http://localhost:11434")
-    monkeypatch.setenv("OLLAMA_MODEL", "llama3:8b")
+    monkeypatch.setenv("OLLAMA_MODEL", "llama3.1:8b")
 
     app = create_app()
     app.config.update({"TESTING": True})
@@ -116,7 +116,7 @@ def test_analyze_placeholder_is_replaced(
     monkeypatch.setenv("DEFAULT_PROMPT_NAME", "test_prompt.txt")
     monkeypatch.setenv("DEFAULT_SYSTEM_PROMPT_NAME", "system_prompt.txt")
     monkeypatch.setenv("OLLAMA_API_URL", "http://localhost:11434")
-    monkeypatch.setenv("OLLAMA_MODEL", "llama3:8b")
+    monkeypatch.setenv("OLLAMA_MODEL", "llama3.1:8b")
 
     app = create_app()
     app.config.update({"TESTING": True})

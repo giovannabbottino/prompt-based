@@ -12,7 +12,7 @@ Example response when the model is available:
   "status": "ok",
   "ollama": {
     "status": "ok",
-    "model": "llama3:8b"
+    "model": "llama3.1:8b"
   }
 }
 ```
@@ -41,7 +41,7 @@ Fields:
 | `text` | Yes | Source text to convert into a knowledge graph. |
 | `prompt_name` | No | Prompt template path under `prompt/`. Defaults to `DEFAULT_PROMPT_NAME`. |
 | `system_prompt_name` | No | System prompt path under `prompt/`. Defaults to `DEFAULT_SYSTEM_PROMPT_NAME`. |
-| `max_rdf_attempts` | No | Number of RDF generation/repair attempts. Values are clamped between 1 and 3. Default: `3`. |
+| `max_rdf_attempts` | No | Number of RDF generation attempts. Values are clamped between 1 and 3. Default: `3`. Every retry uses the same model stage. |
 
 Prompt paths are resolved under the local `prompt/` directory. Path traversal outside that directory is rejected.
 
@@ -57,16 +57,14 @@ User: <text>
 Assistant:
 ```
 
-### RDF validation and repair
+### RDF validation and retry
 
-The model response is normalized before validation:
+Only response wrappers are removed before validation:
 
 - markdown fences are removed;
 - leading non-RDF prose is discarded when a Turtle marker is found;
-- common quote issues are repaired;
-- incomplete trailing blocks can be removed when a complete RDF statement exists.
 
-The final candidate is parsed with `rdflib.Graph.parse(..., format="turtle")`. If parsing fails and attempts remain, the service asks the model to return corrected Turtle only.
+The candidate is parsed strictly with `rdflib.Graph.parse(..., format="turtle")`. If parsing fails and attempts remain, the same model stage is asked to return corrected Turtle. No local syntax repair, statement salvage, or substitute graph is used.
 
 ### Example request
 

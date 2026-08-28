@@ -39,7 +39,7 @@ Request body:
 }
 ```
 
-Only `text` is required. Prompt names are resolved inside the `prompt/` directory. `max_rdf_attempts` is capped at 3 and controls how many times the service asks the model to repair invalid Turtle before returning an error.
+Only `text` is required. Prompt names are resolved inside the `prompt/` directory. `max_rdf_attempts` is capped at 3 and controls how many times the same model stage may regenerate invalid Turtle before returning an error.
 
 Success response:
 
@@ -68,7 +68,7 @@ and pull requests with Python 3.10 and 3.13.
 | DEFAULT_PROMPT_NAME         | Path to the few-shot prompt               | String              | prompts/few-shot.txt             |
 | DEFAULT_SYSTEM_PROMPT_NAME  | Path to the system prompt                 | String              | system/knowledge_graph.txt       |
 | OLLAMA_API_URL              | Ollama API URL                            | String              | http://localhost:11434           |
-| OLLAMA_MODEL                | LLM model name                            | String              | llama3:8b                        |
+| OLLAMA_MODEL                | LLM model name                            | String              | llama3.1:8b                      |
 | OLLAMA_CSV_PATH             | Path to the response log CSV file         | String              | data/ollama_responses.csv        |
 | OLLAMA_SEED                 | Seed for reproducibility                  | Integer (optional)  | -                                |
 | OLLAMA_TEMPERATURE          | Sampling temperature                      | Float (optional)    | -                                |
@@ -78,11 +78,11 @@ and pull requests with Python 3.10 and 3.13.
 | OLLAMA_STOP                 | Stop sequence                             | String (optional)   | -                                |
 | OLLAMA_NUM_CTX              | Context window size                       | Integer (optional)  | -                                |
 | OLLAMA_NUM_PREDICT          | Maximum number of tokens to generate      | Integer (optional)  | -                                |
-| OLLAMA_TIMEOUT_SECONDS      | HTTP timeout for Ollama requests          | Integer             | 180                              |
+| OLLAMA_TIMEOUT_SECONDS      | HTTP timeout for Ollama requests          | Integer             | 660                              |
 
 ## Generated Output and Logs
 
 - The model is called through Ollama `/api/generate` with `stream:false`.
-- Generated text is trimmed to the RDF/Turtle portion, repaired when possible, and parsed with `rdflib.Graph.parse(format="turtle")`.
+- Generated text is trimmed to the RDF/Turtle portion and parsed strictly with `rdflib.Graph.parse(format="turtle")`. Invalid output is never repaired or replaced locally.
 - Successful generations are written to the CSV configured by `OLLAMA_CSV_PATH`.
 - The public API returns only the original `text` and the validated `rdf` string.

@@ -90,7 +90,7 @@ class OllamaClientConfig:
     @classmethod
     def from_env(cls) -> OllamaClientConfig:
         url = _env_value("OLLAMA_API_URL", "http://localhost:11434") or "http://localhost:11434"
-        model = _env_value("OLLAMA_MODEL", "llama3:8b") or "llama3:8b"
+        model = _env_value("OLLAMA_MODEL", "llama3.1:8b") or "llama3.1:8b"
         csv_path = Path(
             _env_value("OLLAMA_CSV_PATH", "data/ollama_responses.csv")
             or "data/ollama_responses.csv"

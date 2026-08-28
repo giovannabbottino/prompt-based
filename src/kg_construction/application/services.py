@@ -1,9 +1,6 @@
-import re
-import unicodedata
-from collections.abc import Iterator
 from typing import Any, Protocol, runtime_checkable
 
-from rdflib import Graph, Namespace
+from rdflib import Graph
 from rdflib.namespace import RDFS
 
 from ..domain.models import AnalyzeRequest, AnalyzeResponse
@@ -109,17 +106,13 @@ class KnowledgeGraphService:
             )
 
             rdf_text = self._extract_rdf_text(str(generation.get("response") or ""))
-            for repair_method, candidate_rdf in self._rdf_repair_candidates(
-                rdf_text, include_salvage=attempt == attempts
-            ):
-                try:
-                    self._parse_rdf(candidate_rdf)
-                    generation["response"] = candidate_rdf
-                    generation["rdf_validation_attempts"] = attempt
-                    generation["rdf_repair_method"] = repair_method
-                    return generation
-                except Exception as exc:  # rdflib raises parser-specific exception classes.
-                    last_error = str(exc)
+            try:
+                self._parse_rdf(rdf_text)
+                generation["response"] = rdf_text
+                generation["rdf_validation_attempts"] = attempt
+                return generation
+            except Exception as exc:  # rdflib raises parser-specific exception classes.
+                last_error = str(exc)
 
             if attempt == attempts:
                 break
@@ -159,148 +152,6 @@ class KnowledgeGraphService:
         if starts:
             text = text[min(starts) :].strip()
         return text
-
-    @classmethod
-    def _rdf_repair_candidates(
-        cls, rdf_text: str, *, include_salvage: bool = True
-    ) -> Iterator[tuple[str, str]]:
-        raw = (rdf_text or "").strip().replace("\r\n", "\n").replace("\r", "\n")
-        raw = raw.replace("\u201c", '"').replace("\u201d", '"').replace("\u2019", "'")
-        raw = re.sub(r'""([^"\n]+)""', r'"\1"', raw)
-
-        seen: set[str] = set()
-
-        def emit(method: str, value: str) -> Iterator[tuple[str, str]]:
-            value = (value or "").strip()
-            if not value or value in seen:
-                return
-            seen.add(value)
-            yield method, value
-
-        yield from emit("trim", raw)
-
-        normalized = cls._normalize_common_turtle_errors(raw)
-        yield from emit("normalize_common_turtle_errors", normalized)
-
-        if raw and not raw.endswith("."):
-            yield from emit("append_final_dot", raw + " .")
-
-        if raw and not raw.endswith("."):
-            lines = raw.splitlines()
-            last_complete_line = None
-            for idx, line in enumerate(lines):
-                if line.strip().endswith("."):
-                    last_complete_line = idx
-            if last_complete_line is not None:
-                yield from emit(
-                    "keep_through_last_complete_statement",
-                    "\n".join(lines[: last_complete_line + 1]),
-                )
-
-            blocks = re.split(r"\n\s*\n", raw)
-            if len(blocks) > 1:
-                candidate = "\n\n".join(blocks[:-1]).strip()
-                if candidate and not candidate.endswith("."):
-                    candidate += " ."
-                yield from emit("drop_incomplete_last_block", candidate)
-
-        if include_salvage:
-            salvaged = cls._salvage_parseable_statements(normalized)
-            yield from emit("salvage_parseable_statements", salvaged)
-
-    @classmethod
-    def _normalize_common_turtle_errors(cls, rdf_text: str) -> str:
-        text = re.sub(r"(?m)^\s*\.\s*$", "", rdf_text).strip()
-        text = re.sub(
-            r'wd:Q(?:\?|[0-9]*,[0-9,]*)\s+rdfs:label\s+"([^"]+)"(@[A-Za-z-]+)?',
-            cls._replace_invalid_wikidata_label_subject,
-            text,
-        )
-        if re.search(r"\bxsd:", text) and not re.search(
-            r"(?im)^\s*(?:@prefix|prefix)\s+xsd:", text
-        ):
-            text = "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n" + text
-        return text.strip()
-
-    @classmethod
-    def _replace_invalid_wikidata_label_subject(cls, match: re.Match[str]) -> str:
-        label = match.group(1)
-        language = match.group(2) or ""
-        return f'kg:{cls._safe_local_name(label)} rdfs:label "{label}"{language}'
-
-    @staticmethod
-    def _safe_local_name(label: str) -> str:
-        normalized = unicodedata.normalize("NFKD", label).encode("ascii", "ignore").decode()
-        local_name = re.sub(r"[^A-Za-z0-9]+", "_", normalized).strip("_").lower()
-        if not local_name:
-            local_name = "unknown_entity"
-        if local_name[0].isdigit():
-            local_name = f"entity_{local_name}"
-        return local_name
-
-    @classmethod
-    def _salvage_parseable_statements(cls, rdf_text: str) -> str:
-        prefix_lines: list[str] = []
-        body_lines: list[str] = []
-        for line in rdf_text.splitlines():
-            if re.match(r"^\s*(?:@prefix|prefix)\s+", line, flags=re.IGNORECASE):
-                prefix_lines.append(line.strip())
-            else:
-                body_lines.append(line)
-
-        prefix_text = "\n".join(prefix_lines)
-        statements: list[str] = []
-        current: list[str] = []
-        for line in body_lines:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            current.append(stripped)
-            if stripped.endswith("."):
-                statements.append("\n".join(current))
-                current = []
-
-        graph = Graph()
-        graph.bind("rdfs", RDFS)
-        graph.bind("wd", Namespace("http://www.wikidata.org/entity/"))
-        graph.bind("kg", Namespace("https://example.org/wikidata-description/"))
-        graph.bind("xsd", Namespace("http://www.w3.org/2001/XMLSchema#"))
-
-        for statement in statements:
-            parsed = cls._try_parse_statement(prefix_text, statement)
-            if parsed is not None:
-                graph += parsed
-                continue
-
-            compact = statement.rstrip().removesuffix(".").strip()
-            clauses = re.split(r"\s*;\s*", compact)
-            first_match = re.match(r"^(\S+)\s+(.+)$", clauses[0], flags=re.DOTALL)
-            if first_match is None:
-                continue
-            subject = first_match.group(1)
-            clause_statements = [
-                clauses[0],
-                *(f"{subject} {clause}" for clause in clauses[1:]),
-            ]
-            for clause_statement in clause_statements:
-                parsed = cls._try_parse_statement(prefix_text, clause_statement + " .")
-                if parsed is None and '"' not in clause_statement:
-                    terms = clause_statement.split()
-                    if len(terms) > 3:
-                        parsed = cls._try_parse_statement(prefix_text, " ".join(terms[:3]) + " .")
-                if parsed is not None:
-                    graph += parsed
-
-        if not graph:
-            return ""
-        return str(graph.serialize(format="turtle")).strip()
-
-    @staticmethod
-    def _try_parse_statement(prefix_text: str, statement: str) -> Graph | None:
-        try:
-            return Graph().parse(data=f"{prefix_text}\n{statement}", format="turtle")
-        except Exception:
-            return None
 
     @staticmethod
     def _build_retry_prompt(original_prompt: str, invalid_rdf: str, parser_error: str) -> str:

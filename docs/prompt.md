@@ -104,9 +104,10 @@ When `/analyze` is called, the service:
 2. replaces `${USER_TEXT}` or `${Text_TEXT}` with the request text;
 3. sends both prompts to Ollama `/api/generate` with `stream:false`;
 4. extracts the RDF/Turtle part of the response;
-5. tries small repairs for common formatting issues;
-6. validates the result with `rdflib.Graph.parse(format="turtle")`;
-7. asks the model to repair invalid Turtle when attempts remain.
+5. validates the result strictly with `rdflib.Graph.parse(format="turtle")`;
+6. asks the same model stage to regenerate invalid Turtle when attempts remain.
+
+No local syntax repair, statement salvage, or substitute RDF is used.
 
 The public API returns only:
 

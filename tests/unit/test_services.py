@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from kg_construction.application.services import KnowledgeGraphService
+import pytest
+
+from kg_construction.application.services import KnowledgeGraphService, RDFValidationError
 from kg_construction.domain.models import AnalyzeRequest
 from kg_construction.infrastructure.prompt_repository import PromptRepository
 
@@ -140,7 +142,44 @@ def test_analyze_retries_when_rdf_has_only_prefixes():
     assert "kg:mango kg:is kg:fruit" in generation["response"]
 
 
-def test_analyze_repairs_doubled_literal_quotes():
+@pytest.mark.parametrize(
+    "invalid_rdf",
+    [
+        (
+            "@prefix ex: <http://example.org/kg/> .\n"
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n"
+            'ex:coqa rdfs:label ""CoQA"" ;\n'
+            "    ex:related ex:dataset ."
+        ),
+        (
+            "@prefix ex: <http://example.org/kg/> .\n"
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n"
+            'ex:valid rdfs:label "Valid" ;\n'
+            "    ex:related ex:dataset .\n\n"
+            'ex:cut rdfs:label "Cut'
+        ),
+        (
+            "@prefix kg: <https://example.org/wikidata-description/> .\n"
+            'kg:mustang kg:production_year "1964"^^xsd:gYear .'
+        ),
+        (
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            "@prefix wd: <http://www.wikidata.org/entity/> .\n"
+            "@prefix kg: <https://example.org/wikidata-description/> .\n"
+            'wd:Q? rdfs:label "calendar date"@en ; kg:is kg:date .\n'
+            "."
+        ),
+        (
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            "@prefix kg: <https://example.org/wikidata-description/> .\n"
+            'kg:bank rdfs:label "Bank"@en ;\n'
+            "  kg:is kg:financial_institution ;\n"
+            "  kg:accepts_deposits ;\n"
+            "  kg:makes_loans ."
+        ),
+    ],
+)
+def test_analyze_rejects_invalid_rdf_without_local_repair(invalid_rdf):
     class StubOllamaClient:
         def generate(
             self,
@@ -149,14 +188,7 @@ def test_analyze_repairs_doubled_literal_quotes():
             prompt_name: str | None = None,
             input_text: str | None = None,
         ):
-            return {
-                "response": (
-                    "@prefix ex: <http://example.org/kg/> .\n"
-                    "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n"
-                    'ex:coqa rdfs:label ""CoQA"" ;\n'
-                    "    ex:related ex:dataset ."
-                )
-            }
+            return {"response": invalid_rdf}
 
     service = KnowledgeGraphService(
         DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside"),
@@ -165,54 +197,15 @@ def test_analyze_repairs_doubled_literal_quotes():
         ollama_client=StubOllamaClient(),
     )
 
-    response = service.analyze(
-        AnalyzeRequest(text="Hello", prompt_name="example.txt", system_prompt_name="system.txt")
-    )
-
-    generation = response.generation
-    assert generation is not None
-    assert '""CoQA""' not in generation["response"]
-    assert '"CoQA"' in generation["response"]
-
-
-def test_analyze_drops_incomplete_last_statement():
-    class StubOllamaClient:
-        def generate(
-            self,
-            system_prompt: str,
-            prompt: str,
-            prompt_name: str | None = None,
-            input_text: str | None = None,
-        ):
-            return {
-                "response": (
-                    "@prefix ex: <http://example.org/kg/> .\n"
-                    "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n"
-                    'ex:valid rdfs:label "Valid" ;\n'
-                    "    ex:related ex:dataset .\n\n"
-                    'ex:cut rdfs:label "Cut'
-                )
-            }
-
-    service = KnowledgeGraphService(
-        DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside"),
-        default_prompt="example.txt",
-        default_system_prompt="system.txt",
-        ollama_client=StubOllamaClient(),
-    )
-
-    response = service.analyze(
-        AnalyzeRequest(text="Hello", prompt_name="example.txt", system_prompt_name="system.txt")
-    )
-
-    generation = response.generation
-    assert generation is not None
-    assert 'ex:valid rdfs:label "Valid"' in generation["response"]
-    assert "ex:cut" not in generation["response"]
-    assert generation["rdf_repair_method"] in {
-        "keep_through_last_complete_statement",
-        "drop_incomplete_last_block",
-    }
+    with pytest.raises(RDFValidationError):
+        service.analyze(
+            AnalyzeRequest(
+                text="Hello",
+                prompt_name="example.txt",
+                system_prompt_name="system.txt",
+                max_rdf_attempts=1,
+            )
+        )
 
 
 def test_analyze_retries_instead_of_dropping_complete_invalid_blocks():
@@ -247,89 +240,3 @@ def test_analyze_retries_instead_of_dropping_complete_invalid_blocks():
     assert generation is not None
     assert "kg:second" in generation["response"]
     assert generation["rdf_validation_attempts"] == 2
-
-
-def test_analyze_adds_missing_xsd_prefix_without_retry():
-    class StubOllamaClient:
-        def generate(self, system_prompt, prompt, prompt_name=None, input_text=None):
-            return {
-                "response": (
-                    "@prefix kg: <https://example.org/wikidata-description/> .\n"
-                    'kg:mustang kg:production_year "1964"^^xsd:gYear .'
-                )
-            }
-
-    service = KnowledgeGraphService(
-        DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside"),
-        default_prompt="example.txt",
-        default_system_prompt="system.txt",
-        ollama_client=StubOllamaClient(),
-    )
-
-    response = service.analyze(AnalyzeRequest(text="Mustang", max_rdf_attempts=1))
-
-    generation = response.generation
-    assert generation is not None
-    assert "@prefix xsd:" in generation["response"]
-    assert generation["rdf_repair_method"] == "normalize_common_turtle_errors"
-
-
-def test_analyze_replaces_invalid_wikidata_placeholder_and_stray_dot():
-    class StubOllamaClient:
-        def generate(self, system_prompt, prompt, prompt_name=None, input_text=None):
-            return {
-                "response": (
-                    "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
-                    "@prefix wd: <http://www.wikidata.org/entity/> .\n"
-                    "@prefix kg: <https://example.org/wikidata-description/> .\n"
-                    'wd:Q? rdfs:label "calendar date"@en ; kg:is kg:date .\n'
-                    "."
-                )
-            }
-
-    service = KnowledgeGraphService(
-        DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside"),
-        default_prompt="example.txt",
-        default_system_prompt="system.txt",
-        ollama_client=StubOllamaClient(),
-    )
-
-    response = service.analyze(AnalyzeRequest(text="Date", max_rdf_attempts=1))
-
-    generation = response.generation
-    assert generation is not None
-    assert "wd:Q?" not in generation["response"]
-    assert "kg:calendar_date" in generation["response"]
-    assert generation["rdf_repair_method"] == "normalize_common_turtle_errors"
-
-
-def test_analyze_salvages_valid_clauses_from_invalid_subject_block():
-    class StubOllamaClient:
-        def generate(self, system_prompt, prompt, prompt_name=None, input_text=None):
-            return {
-                "response": (
-                    "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
-                    "@prefix kg: <https://example.org/wikidata-description/> .\n"
-                    'kg:bank rdfs:label "Bank"@en ;\n'
-                    "  kg:is kg:financial_institution ;\n"
-                    "  kg:accepts_deposits ;\n"
-                    "  kg:makes_loans ."
-                )
-            }
-
-    service = KnowledgeGraphService(
-        DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside"),
-        default_prompt="example.txt",
-        default_system_prompt="system.txt",
-        ollama_client=StubOllamaClient(),
-    )
-
-    response = service.analyze(AnalyzeRequest(text="Bank", max_rdf_attempts=1))
-
-    generation = response.generation
-    assert generation is not None
-    rdf = generation["response"]
-    assert "financial_institution" in rdf
-    assert "accepts_deposits" not in rdf
-    assert "makes_loans" not in rdf
-    assert generation["rdf_repair_method"] == "salvage_parseable_statements"
