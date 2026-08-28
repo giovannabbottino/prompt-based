@@ -2,6 +2,29 @@
 
 Small Flask API that accepts text, combines it with prompt templates, asks Ollama to generate RDF/Turtle, validates the result with `rdflib`, and returns the generated RDF. The project ships with a system prompt and a few-shot prompt for knowledge-graph construction.
 
+This is the prompt-only baseline in the evaluation workspace. It does not query
+Wikidata or inject external graph evidence, which isolates the contribution of
+the prompt and model from the ontology-grounded and hybrid variants.
+
+## Quick start
+
+Requirements: Python 3.10 or newer and a running Ollama instance with the
+configured model.
+
+```bash
+ollama pull llama3.1:8b
+python -m pip install -e ".[dev]"
+python -m flask --app kg_construction.app:create_app run --port 5000
+```
+
+In another terminal:
+
+```bash
+curl -X POST http://127.0.0.1:5000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Alice knows Bob.","max_rdf_attempts":3}'
+```
+
 ## Process Flow
 
 ![Process Flow](docs/figures/process.jpg)
@@ -56,7 +79,7 @@ See [docs/prompt.md](docs/prompt.md) for an explanation of the system prompt, fe
 
 ## Development quality checks
 
-Install the development dependencies with `python -m pip install -r requirements-dev.txt`,
+Install the development dependencies with `python -m pip install -e ".[dev]"`,
 then run `python -m ruff format --check .`, `python -m ruff check .`,
 `python -m pyright`, and `python -m pytest`. GitHub Actions runs the same checks on pushes
 and pull requests with Python 3.10 and 3.13.
@@ -77,8 +100,8 @@ and pull requests with Python 3.10 and 3.13.
 | OLLAMA_MIN_P                | Minimum probability threshold             | Float (optional)    | -                                |
 | OLLAMA_STOP                 | Stop sequence                             | String (optional)   | -                                |
 | OLLAMA_NUM_CTX              | Context window size                       | Integer (optional)  | -                                |
-| OLLAMA_NUM_PREDICT          | Maximum number of tokens to generate      | Integer (optional)  | -                                |
-| OLLAMA_TIMEOUT_SECONDS      | HTTP timeout for Ollama requests          | Integer             | 660                              |
+| OLLAMA_NUM_PREDICT          | Maximum number of tokens to generate      | Integer (optional)  | unset; Compose uses 1536          |
+| OLLAMA_TIMEOUT_SECONDS      | HTTP timeout for Ollama requests          | Integer             | 180; Compose uses 660             |
 
 ## Generated Output and Logs
 
