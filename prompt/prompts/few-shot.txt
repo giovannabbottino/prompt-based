@@ -15,7 +15,40 @@ Requirements:
 @prefix kg: <https://example.org/wikidata-description/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+<EXAMPLES>
+
+Text:
+Alice manages a research laboratory in Lisbon.
+
+RDF/Turtle:
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix kg: <https://example.org/wikidata-description/> .
+
+kg:alice rdfs:label "Alice"@en ;
+  kg:manages kg:research_laboratory .
+
+kg:research_laboratory rdfs:label "research laboratory"@en ;
+  kg:located_in kg:lisbon .
+
+kg:lisbon rdfs:label "Lisbon"@en .
+
+Text:
+A mango is a fruit.
+
+RDF/Turtle:
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix kg: <https://example.org/wikidata-description/> .
+
+kg:mango rdfs:label "mango"@en ;
+  kg:is kg:fruit .
+
+kg:fruit rdfs:label "fruit"@en .
+
+</EXAMPLES>
+
+<CURRENT_TEXT>
 Text:
 ${USER_TEXT}
+</CURRENT_TEXT>
 
 RDF/Turtle:
