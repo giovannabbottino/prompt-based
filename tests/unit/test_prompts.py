@@ -1,28 +1,25 @@
 from pathlib import Path
 
 
-def test_few_shot_prompt_requires_wikidata_ids_and_text_labels():
+def test_user_prompt_is_generic_and_requires_strict_turtle():
     prompt = Path("prompt/prompts/few-shot.txt").read_text(encoding="utf-8")
 
-    assert "exact Wikidata resource `wd:Q...`" in prompt
-    assert "The QID must appear as the subject or object" in prompt
-    assert "never invent a QID" in prompt
-    assert "exact human-readable surface form from the input Text" in prompt
-    assert "Prefix declarations without relationship triples are not a valid answer" in prompt
-    assert "Cover every distinct entity or sense" in prompt
-    assert "additional rdfs:label on the same subject" in prompt
-    assert "complete output must conform to the standard RDF/Turtle grammar" in prompt
-    assert "valid Turtle syntax takes precedence" in prompt
-    assert " a kg:" not in prompt
-    assert "wd:Q7251" in prompt
-    assert "wd:Q7186" in prompt
+    assert "Convert the text below into a knowledge graph" in prompt
+    assert "Follow RDF 1.1 Turtle syntax strictly" in prompt
+    assert "different predicates for the same subject with `;`" in prompt
+    assert "multiple objects of the same predicate with `,`" in prompt
+    assert 'rdflib.Graph.parse(format="turtle")' in prompt
+    assert "Never invent a QID" in prompt
+    assert "${USER_TEXT}" in prompt
+    assert "Some examples" not in prompt
 
 
-def test_system_prompt_preserves_known_qids_and_surface_labels():
+def test_system_prompt_assigns_role_and_enforces_turtle_only_output():
     prompt = Path("prompt/system/knowledge_graph.txt").read_text(encoding="utf-8")
 
-    assert "exact `wd:Q...` Wikidata resource" in prompt
-    assert "Never invent a QID" in prompt
-    assert "exact human-readable surface form from the input text" in prompt
-    assert "complete output must conform to the standard RDF/Turtle grammar" in prompt
-    assert "valid Turtle syntax takes precedence" in prompt
+    assert prompt.startswith("Role: You are an RDF knowledge graph engineer.")
+    assert "Follow RDF 1.1 Turtle syntax strictly" in prompt
+    assert "Use `;` between different predicates" in prompt
+    assert "Use `,` only between multiple objects" in prompt
+    assert "Return only RDF/Turtle" in prompt
+    assert "Valid Turtle syntax takes precedence" in prompt
