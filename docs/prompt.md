@@ -17,7 +17,9 @@ The system prompt assigns the model the role `RDF knowledge graph engineer`. It 
 - use `,` only between multiple objects of the same predicate;
 - end every statement with `.`;
 - never leave a predicate without an object;
-- use only prefixes declared by the user prompt;
+- declare every prefix in the same response before using it;
+- include the exact `kg:` declaration whenever a `kg:` name is used;
+- never place two objects next to each other without Turtle punctuation;
 - label every resource with `rdfs:label` and a language tag;
 - never invent a Wikidata QID.
 
@@ -79,7 +81,8 @@ After Ollama answers, the service removes only response wrappers and validates t
 - Keep the two example transformations identical in both projects.
 - Keep `${USER_TEXT}` inside `<CURRENT_TEXT>`.
 - Keep example Turtle self-contained and parseable.
-- Keep the distinction between `;`, `,`, and `.` explicit.
+- Keep the shared mandatory syntax block identical in all three pipelines.
+- Keep prefix binding and the distinction between `;`, `,`, and `.` explicit.
 - Do not introduce undeclared prefixes or domain-specific requirements into the shared core.
 - Add ontology-specific grounding only to the ontology prompt's dedicated Wikidata block.
 - Update `tests/unit/test_prompts.py` whenever the prompt contract or examples change.

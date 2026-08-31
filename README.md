@@ -114,6 +114,7 @@ and pull requests with Python 3.12.
 
 - The model is called through Ollama `/api/generate` with `stream:false`.
 - Generated text is trimmed to the RDF/Turtle portion and parsed strictly with `rdflib.Graph.parse(format="turtle")`. Invalid output is never repaired or replaced locally.
+- The system and user prompts share the same mandatory prefix-binding and Turtle-punctuation rules used by the ontology and hybrid pipelines.
 - Successful generations are written to the CSV configured by `OLLAMA_CSV_PATH`.
 - Request lifecycle and strict RDF-validation events are written as JSON Lines to `ANALYZE_LOG_PATH`, correlated by `idempotence_key`.
 - The public API returns only the original `text` and the validated `rdf` string.

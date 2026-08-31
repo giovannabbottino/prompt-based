@@ -6,9 +6,17 @@ Requirements:
 - Give every resource an `rdfs:label` using the wording from the text and a language tag.
 - Use a known `wd:Q...` resource only when its QID is reliable. Otherwise, use a descriptive `kg:` resource. Never invent a QID.
 - Use concise `kg:` predicates that preserve the meaning of the text.
-- Use only the prefixes declared below.
-- Follow RDF 1.1 Turtle syntax strictly. Separate different predicates for the same subject with `;`, separate multiple objects of the same predicate with `,`, and end every statement with `.`.
 - Every predicate must have an object, and the complete response must parse with `rdflib.Graph.parse(format="turtle")`.
+
+Mandatory Turtle syntax rules:
+- Follow RDF 1.1 Turtle syntax strictly.
+- Every prefix used in a triple MUST be declared in the same response before its first use.
+- If any `kg:` name is used, include exactly `@prefix kg: <https://example.org/wikidata-description/> .`.
+- Never write two objects next to each other without Turtle punctuation.
+- Use `,` only to separate multiple objects of the same predicate.
+- Use `;` to continue the same subject with a different predicate, and write that predicate after `;`.
+- Use `.` to end each subject statement.
+- Before returning, verify that every used prefix is bound and every predicate-object list is correctly punctuated.
 
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix wd: <http://www.wikidata.org/entity/> .
