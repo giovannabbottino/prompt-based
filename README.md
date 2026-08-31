@@ -6,6 +6,11 @@ This is the prompt-only baseline in the evaluation workspace. It does not query
 Wikidata or inject external graph evidence, which isolates the contribution of
 the prompt and model from the ontology-grounded and hybrid variants.
 
+The default system prompt assigns the model the role of RDF knowledge graph engineer and
+requires strict RDF 1.1 Turtle syntax. The default few-shot prompt contains two concise,
+RDFLib-validated examples. Its core is identical to the ontology-based prompt; only the
+ontology variant adds Wikidata-grounding instructions.
+
 ## Quick start
 
 Requirements: Python 3.12 and a running Ollama instance with the
@@ -89,7 +94,7 @@ and pull requests with Python 3.12.
 
 | Variable                    | Description                               | Type                | Default/Example Value            |
 |-----------------------------|-------------------------------------------|---------------------|----------------------------------|
-| DEFAULT_PROMPT_NAME         | Path to the few-shot prompt               | String              | prompts/few-shot.txt             |
+| DEFAULT_PROMPT_NAME         | Path to the shared-core few-shot prompt   | String              | prompts/few-shot.txt             |
 | DEFAULT_SYSTEM_PROMPT_NAME  | Path to the system prompt                 | String              | system/knowledge_graph.txt       |
 | OLLAMA_API_URL              | Ollama API URL                            | String              | http://localhost:11434           |
 | OLLAMA_MODEL                | LLM model name                            | String              | llama3.1:8b                      |

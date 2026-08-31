@@ -59,6 +59,10 @@ User: <text>
 Assistant:
 ```
 
+The default system prompt assigns the `RDF knowledge graph engineer` role. The default
+few-shot prompt contains two compact RDFLib-validated examples. Its generic core is kept
+identical to the ontology prompt, whose only additional instructions concern Wikidata.
+
 ### RDF validation and retry
 
 Only response wrappers are removed before validation:
