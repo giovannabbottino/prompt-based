@@ -11,6 +11,8 @@ def test_few_shot_prompt_requires_wikidata_ids_and_text_labels():
     assert "Prefix declarations without relationship triples are not a valid answer" in prompt
     assert "Cover every distinct entity or sense" in prompt
     assert "additional rdfs:label on the same subject" in prompt
+    assert "complete output must conform to the standard RDF/Turtle grammar" in prompt
+    assert "valid Turtle syntax takes precedence" in prompt
     assert " a kg:" not in prompt
     assert "wd:Q7251" in prompt
     assert "wd:Q7186" in prompt
@@ -22,3 +24,5 @@ def test_system_prompt_preserves_known_qids_and_surface_labels():
     assert "exact `wd:Q...` Wikidata resource" in prompt
     assert "Never invent a QID" in prompt
     assert "exact human-readable surface form from the input text" in prompt
+    assert "complete output must conform to the standard RDF/Turtle grammar" in prompt
+    assert "valid Turtle syntax takes precedence" in prompt

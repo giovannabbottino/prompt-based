@@ -9,12 +9,13 @@ The application loads `.env` when running locally and also accepts regular envir
 - `OLLAMA_API_URL=http://localhost:11434`
 - `OLLAMA_MODEL=llama3.1:8b`
 - `OLLAMA_CSV_PATH=data/ollama_responses.csv`
+- `ANALYZE_LOG_PATH=data/analyze_log.jsonl`
 - `OLLAMA_TIMEOUT_SECONDS=660`
 - Generation options, all optional and ignored when blank: `OLLAMA_SEED`, `OLLAMA_TEMPERATURE`, `OLLAMA_TOP_K`, `OLLAMA_TOP_P`, `OLLAMA_MIN_P`, `OLLAMA_STOP`, `OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT`.
 
 ## Requirements
 
-- Python >=3.10
+- Python 3.12
 - Ollama with the configured model installed
 
 ## Run with Docker Compose
@@ -101,6 +102,7 @@ DEFAULT_SYSTEM_PROMPT_NAME=system/knowledge_graph.txt
 OLLAMA_API_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.1:8b
 OLLAMA_CSV_PATH=data/ollama_responses.csv
+ANALYZE_LOG_PATH=data/analyze_log.jsonl
 OLLAMA_TIMEOUT_SECONDS=660
 OLLAMA_NUM_PREDICT=768
 ```
@@ -108,7 +110,7 @@ OLLAMA_NUM_PREDICT=768
 ### 4. Run the API
 
 ```bash
-python -m kg_construction.app
+python -m prompt_based
 ```
 
 The service listens on `http://127.0.0.1:5000`.

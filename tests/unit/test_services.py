@@ -1,10 +1,12 @@
+import json
 from pathlib import Path
 
 import pytest
 
-from kg_construction.application.services import KnowledgeGraphService, RDFValidationError
-from kg_construction.domain.models import AnalyzeRequest
-from kg_construction.infrastructure.prompt_repository import PromptRepository
+from prompt_based.application.services import KnowledgeGraphService, RDFValidationError
+from prompt_based.domain.models import AnalyzeRequest
+from prompt_based.infrastructure.prompt_repository import PromptRepository
+from prompt_based.infrastructure.request_logger import RequestLogger
 
 
 class DummyPromptRepo(PromptRepository):
@@ -14,6 +16,44 @@ class DummyPromptRepo(PromptRepository):
 
     def load_prompt(self, prompt_name: str) -> str:
         return self.prompt_text
+
+
+def test_analyze_logs_request_lifecycle_with_idempotence_key(tmp_path):
+    class StubOllamaClient:
+        def generate(
+            self,
+            system_prompt: str,
+            prompt: str,
+            prompt_name: str | None = None,
+            input_text: str | None = None,
+        ):
+            return {
+                "response": (
+                    "<http://example.org/s> <http://example.org/p> "
+                    "<http://example.org/o> ."
+                )
+            }
+
+    log_path = tmp_path / "analyze.jsonl"
+    service = KnowledgeGraphService(
+        DummyPromptRepo(prompt_text="Build RDF for ${USER_TEXT}"),
+        default_prompt="example.txt",
+        default_system_prompt="system.txt",
+        ollama_client=StubOllamaClient(),
+        request_logger=RequestLogger(log_path),
+    )
+
+    service.analyze(AnalyzeRequest(text="Hello", idempotence_key="request-123"))
+
+    entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert {entry["idempotence_key"] for entry in entries} == {"request-123"}
+    assert [entry["event"] for entry in entries] == [
+        "analyze_started",
+        "llm_rdf_request",
+        "llm_rdf_response",
+        "rdf_validated",
+        "analyze_completed",
+    ]
 
 
 def test_analyze_builds_payload():
@@ -104,6 +144,9 @@ def test_analyze_retries_until_rdf_is_valid():
     assert generation["rdf_validation_attempts"] == 2
     assert len(ollama.prompts) == 2
     assert "previous answer was not valid Turtle RDF" in ollama.prompts[1]
+    assert "Previous invalid RDF:\nnot rdf" in ollama.prompts[1]
+    assert "every statement conforms to the standard RDF/Turtle grammar" in ollama.prompts[1]
+    assert "correct the entire RDF document" in ollama.prompts[1]
 
 
 def test_analyze_retries_when_rdf_has_only_prefixes():

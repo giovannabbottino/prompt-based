@@ -1,5 +1,6 @@
 You are going to receive a Text. Transform it to a knowledge graph using RDF/Turtle syntax.
 Return only the RDF/Turtle output. Do not write explanations, notes, headings, or markdown.
+The complete output must conform to the standard RDF/Turtle grammar and parse without errors with `rdflib.Graph.parse(format="turtle")`. Apply the grammar to every statement in the document; the examples below do not replace or limit the Turtle syntax rules. If any instruction or example conflicts with valid Turtle syntax, valid Turtle syntax takes precedence.
 Every subject block must end with a period.
 Prefix declarations without relationship triples are not a valid answer.
 Cover every distinct entity or sense described in the complete input Text; do not stop after the first sentence or first sense.
@@ -9,7 +10,7 @@ When the Text says an entity is "known as", "better known as", or has a trade na
 Literal labels must use exactly one pair of double quotes, never doubled quotes.
 Use only the declared prefixes below. Do not use undeclared prefixes such as schema: or ex:.
 Every predicate must be followed by an object. Never emit a predicate by itself.
-Separate multiple objects of one predicate with commas. Never place two objects next to each other without a comma, and never append `true` after another object.
+Use RDF/Turtle predicate-object lists and object lists according to the standard grammar. Never place two objects next to each other without valid Turtle punctuation, and never append `true` after another object.
 Use the exact Wikidata resource `wd:Q...` for a recognizable real-world entity when you know its QID confidently. The QID must appear as the subject or object of relationship triples, not as a label-only literal.
 Never emit placeholders or malformed Wikidata IDs such as `wd:Q?`, and never encode a number as a Wikidata ID. When the QID is unknown, use a labeled `kg:` resource.
 Do not replace a known Wikidata entity with a generated `kg:` resource. Use `kg:` with a snake_case local name only for concepts that have no confidently known QID; never invent a QID.

@@ -8,13 +8,13 @@ the prompt and model from the ontology-grounded and hybrid variants.
 
 ## Quick start
 
-Requirements: Python 3.10 or newer and a running Ollama instance with the
+Requirements: Python 3.12 and a running Ollama instance with the
 configured model.
 
 ```bash
 ollama pull llama3.1:8b
 python -m pip install -e ".[dev]"
-python -m flask --app kg_construction.app:create_app run --port 5000
+python -m prompt_based
 ```
 
 In another terminal:
@@ -30,7 +30,8 @@ curl -X POST http://127.0.0.1:5000/analyze \
 ![Process Flow](docs/figures/process.jpg)
 
 ## Project Layout
-- `src/kg_construction/` - installable Python package using the standard `src` layout,
+- `src/prompt_based/` - importable application package, organized into controller,
+  application, domain, and infrastructure layers,
   with controller, application, domain, and infrastructure layers.
 - `prompt/system/` - System prompts that define LLM behavior and output constraints.
 - `prompt/prompts/` - User prompt templates. The default template includes the `${USER_TEXT}` placeholder.
@@ -82,7 +83,7 @@ See [docs/prompt.md](docs/prompt.md) for an explanation of the system prompt, fe
 Install the development dependencies with `python -m pip install -e ".[dev]"`,
 then run `python -m ruff format --check .`, `python -m ruff check .`,
 `python -m pyright`, and `python -m pytest`. GitHub Actions runs the same checks on pushes
-and pull requests with Python 3.10 and 3.13.
+and pull requests with Python 3.12.
 
 ## LLM Configuration
 
@@ -102,10 +103,12 @@ and pull requests with Python 3.10 and 3.13.
 | OLLAMA_NUM_CTX              | Context window size                       | Integer (optional)  | -                                |
 | OLLAMA_NUM_PREDICT          | Maximum number of tokens to generate      | Integer (optional)  | unset; Compose uses 1536          |
 | OLLAMA_TIMEOUT_SECONDS      | HTTP timeout for Ollama requests          | Integer             | 180; Compose uses 660             |
+| ANALYZE_LOG_PATH            | JSONL request-event log path              | Path                | data/analyze_log.jsonl            |
 
 ## Generated Output and Logs
 
 - The model is called through Ollama `/api/generate` with `stream:false`.
 - Generated text is trimmed to the RDF/Turtle portion and parsed strictly with `rdflib.Graph.parse(format="turtle")`. Invalid output is never repaired or replaced locally.
 - Successful generations are written to the CSV configured by `OLLAMA_CSV_PATH`.
+- Request lifecycle and strict RDF-validation events are written as JSON Lines to `ANALYZE_LOG_PATH`, correlated by `idempotence_key`.
 - The public API returns only the original `text` and the validated `rdf` string.

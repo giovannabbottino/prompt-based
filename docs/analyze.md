@@ -21,13 +21,14 @@ If Ollama is reachable but the configured model is missing, `ollama.status` is `
 
 ## `POST /analyze`
 
-Builds a prompt from the input text, calls Ollama, validates the generated Turtle RDF, logs the generation metadata to CSV, and returns the validated RDF.
+Builds a prompt from the input text, calls Ollama, validates the generated Turtle RDF, logs the generation metadata to CSV and lifecycle events to JSONL, and returns the validated RDF.
 
 ### Request body
 
 ```json
 {
   "text": "Alice knows Bob.",
+  "idempotence_key": "request-123",
   "prompt_name": "prompts/few-shot.txt",
   "system_prompt_name": "system/knowledge_graph.txt",
   "max_rdf_attempts": 3
@@ -39,6 +40,7 @@ Fields:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `text` | Yes | Source text to convert into a knowledge graph. |
+| `idempotence_key` | No | String used to correlate all JSONL events for this request. A UUID is generated when omitted. |
 | `prompt_name` | No | Prompt template path under `prompt/`. Defaults to `DEFAULT_PROMPT_NAME`. |
 | `system_prompt_name` | No | System prompt path under `prompt/`. Defaults to `DEFAULT_SYSTEM_PROMPT_NAME`. |
 | `max_rdf_attempts` | No | Number of RDF generation attempts. Values are clamped between 1 and 3. Default: `3`. Every retry uses the same model stage. |
@@ -65,6 +67,10 @@ Only response wrappers are removed before validation:
 - leading non-RDF prose is discarded when a Turtle marker is found;
 
 The candidate is parsed strictly with `rdflib.Graph.parse(..., format="turtle")`. If parsing fails and attempts remain, the same model stage is asked to return corrected Turtle. No local syntax repair, statement salvage, or substitute graph is used.
+
+### Request-event log
+
+`ANALYZE_LOG_PATH` defaults to `data/analyze_log.jsonl`. Each line contains `timestamp`, `idempotence_key`, `event`, and `payload`. Logging is best-effort and does not fail an analysis if the log file cannot be written.
 
 ### Example request
 
@@ -104,4 +110,4 @@ Invoke-RestMethod `
 | `400` | Missing `text` or invalid prompt path | `{ "error": "..." }` |
 | `404` | Prompt file not found | `{ "error": "..." }` |
 | `502` | Ollama request failed or model is unavailable | `{ "error": "...", "details": "..." }` |
-| `508` | RDF could not be parsed after all attempts | `{ "error": "rdf parse errror", "attempts": 3, "details": "..." }` |
+| `422` | RDF could not be parsed after all attempts | `{ "error": "RDF parsing failed.", "attempts": 3, "details": "..." }` |

@@ -10,6 +10,8 @@ from typing import Any
 import requests
 from requests import Response
 
+from ..domain.rdf_validation import rdf_validation_result
+
 
 def _env_value(name: str, default: str | None = None) -> str | None:
     value = os.getenv(name)
@@ -38,13 +40,6 @@ def _float_from_env(name: str) -> float | None:
         return float(value)
     except ValueError:
         return None
-
-
-def _is_likely_turtle(text: str) -> bool:
-    """Lightweight heuristic to flag RDF/Turtle-like responses."""
-    if not text:
-        return False
-    return "@prefix" in text and (";" in text or "." in text)
 
 
 @dataclass(frozen=True)
@@ -219,8 +214,7 @@ class OllamaClient:
         ]
         write_header = not csv_path.exists()
         response_text = str(data.get("response") or "")
-        rdf_valid = _is_likely_turtle(response_text)
-        rdf_note = "" if rdf_valid else "Response not recognized as RDF/Turtle."
+        rdf_valid, rdf_note = rdf_validation_result(response_text)
         with csv_path.open("a", encoding="utf-8", newline="") as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
             if write_header:

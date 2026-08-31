@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from kg_construction.app import create_app
-from kg_construction.infrastructure import prompt_repository
+from prompt_based.app import create_app
+from prompt_based.infrastructure import prompt_repository
 
 
 @pytest.fixture()
@@ -41,7 +41,7 @@ def ollama_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
     csv_path = tmp_path / "ollama.csv"
     monkeypatch.setenv("OLLAMA_CSV_PATH", str(csv_path))
-    monkeypatch.setattr("kg_construction.infrastructure.ollama_client.requests.post", fake_post)
+    monkeypatch.setattr("prompt_based.infrastructure.ollama_client.requests.post", fake_post)
 
     return captured, sample_response, csv_path
 
