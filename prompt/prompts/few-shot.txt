@@ -30,27 +30,29 @@ Alice manages a research laboratory in Lisbon.
 
 RDF/Turtle:
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix wd: <http://www.wikidata.org/entity/> .
 @prefix kg: <https://example.org/wikidata-description/> .
 
 kg:alice rdfs:label "Alice"@en ;
   kg:manages kg:research_laboratory .
 
 kg:research_laboratory rdfs:label "research laboratory"@en ;
-  kg:located_in kg:lisbon .
+  kg:located_in wd:Q597 .
 
-kg:lisbon rdfs:label "Lisbon"@en .
+wd:Q597 rdfs:label "Lisbon"@en .
 
 Text:
 A mango is a fruit.
 
 RDF/Turtle:
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix wd: <http://www.wikidata.org/entity/> .
 @prefix kg: <https://example.org/wikidata-description/> .
 
-kg:mango rdfs:label "mango"@en ;
-  kg:is kg:fruit .
+wd:Q169 rdfs:label "mango"@en ;
+  kg:is wd:Q3314483 .
 
-kg:fruit rdfs:label "fruit"@en .
+wd:Q3314483 rdfs:label "fruit"@en .
 
 </EXAMPLES>
 

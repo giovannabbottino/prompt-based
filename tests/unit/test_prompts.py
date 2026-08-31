@@ -28,6 +28,9 @@ def test_user_prompt_is_generic_and_requires_strict_turtle():
     assert "<EXAMPLES>" in prompt
     assert "Alice manages a research laboratory in Lisbon." in prompt
     assert "A mango is a fruit." in prompt
+    assert 'wd:Q597 rdfs:label "Lisbon"@en' in prompt
+    assert 'wd:Q169 rdfs:label "mango"@en' in prompt
+    assert 'kg:is wd:Q3314483' in prompt
     assert "<CURRENT_TEXT>" in prompt
 
 
