@@ -64,3 +64,4 @@ def test_user_and_system_prompts_share_mandatory_turtle_rules():
     assert "Never write two objects next to each other" in rules
     assert "Use `,` only to separate multiple objects of the same predicate" in rules
     assert "Use `;` to continue the same subject with a different predicate" in rules
+    assert "never `subject kg:is a object`" in rules
