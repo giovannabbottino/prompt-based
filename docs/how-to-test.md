@@ -1,7 +1,7 @@
 # How to test
 
 Tests are organized by scope:
-- `tests/unit/` for service behavior, prompt substitution, RDF validation, retries, and repair logic.
+- `tests/unit/` for service behavior, prompt substitution, strict RDF validation, same-model retries, and RDFLib validation of both few-shot examples.
 - `tests/integration/` for request flows through the Flask app factory with mocked Ollama calls and temporary prompt files.
 
 ## Run all tests
