@@ -21,7 +21,7 @@ If Ollama is reachable but the configured model is missing, `ollama.status` is `
 
 ## `POST /analyze`
 
-Builds a prompt from the input text, calls Ollama, validates the generated Turtle RDF, logs the generation metadata to CSV and lifecycle events to JSONL, and returns the validated RDF.
+Builds a prompt from the input text, calls Ollama for structured triples, constructs and serializes an RDFLib graph, logs the generation metadata to CSV and lifecycle events to JSONL, and returns the validated Turtle string.
 
 ### Request body
 
@@ -59,18 +59,20 @@ User: <text>
 Assistant:
 ```
 
-The default system prompt assigns the `RDF knowledge graph engineer` role. The default
-few-shot prompt contains two compact RDFLib-validated examples. Its generic core is kept
-identical to the ontology prompt, whose only additional instructions concern Wikidata.
+The default prompts require the same structured-triple JSON contract as the ontology and hybrid
+pipelines. The ontology prompt adds Wikidata-specific grounding instructions.
 
 ### RDF validation and retry
 
-Only response wrappers are removed before validation:
+The bundled client requests structured JSON; the converter then applies these checks:
 
-- markdown fences are removed;
-- leading non-RDF prose is discarded when a Turtle marker is found;
+- the response must contain a non-empty `triples` array;
+- identifiers and literal metadata are validated;
+- unsafe `kg:` local names are normalized to snake_case;
+- the triples are added to an RDFLib graph and serialized as Turtle.
 
-The candidate is parsed strictly with `rdflib.Graph.parse(..., format="turtle")`. If parsing fails and attempts remain, the same model stage is asked to return corrected Turtle. No local syntax repair, statement salvage, or substitute graph is used.
+If structured validation fails and attempts remain, the same model stage is asked for corrected
+JSON. The serialized Turtle is parsed before it is returned.
 
 ### Request-event log
 
@@ -115,3 +117,7 @@ Invoke-RestMethod `
 | `404` | Prompt file not found | `{ "error": "..." }` |
 | `502` | Ollama request failed or model is unavailable | `{ "error": "...", "details": "..." }` |
 | `422` | RDF could not be parsed after all attempts | `{ "error": "RDF parsing failed.", "attempts": 3, "details": "..." }` |
+
+See the [structured RDF contract](structured-rdf.md) for identifier normalization,
+literal metadata, and legacy custom-client compatibility, and the
+[pipeline diagrams](diagrams.md) for generation and retry boundaries.

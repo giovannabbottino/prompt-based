@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from ..domain.models import AnalyzeRequest, AnalyzeResponse
 from ..domain.rdf_validation import extract_rdf_text, validate_rdf
+from ..domain.structured_rdf import model_response_to_turtle
 from ..infrastructure.prompt_repository import PromptRepository
 from ..infrastructure.request_logger import RequestLogger
 
@@ -131,8 +132,9 @@ class KnowledgeGraphService:
                 {"attempt": attempt, "response": str(generation.get("response") or "")},
             )
 
-            rdf_text = self._extract_rdf_text(str(generation.get("response") or ""))
+            model_response = str(generation.get("response") or "")
             try:
+                rdf_text = model_response_to_turtle(model_response)
                 self._parse_rdf(rdf_text)
                 generation["response"] = rdf_text
                 generation["rdf_validation_attempts"] = attempt
@@ -153,7 +155,7 @@ class KnowledgeGraphService:
             if attempt == attempts:
                 break
             current_prompt = self._build_retry_prompt(
-                prompt, rdf_text, last_error or "Invalid Turtle RDF."
+                prompt, model_response, last_error or "Invalid structured RDF response."
             )
 
         raise RDFValidationError(
@@ -171,20 +173,17 @@ class KnowledgeGraphService:
         return extract_rdf_text(response_text)
 
     @staticmethod
-    def _build_retry_prompt(original_prompt: str, invalid_rdf: str, parser_error: str) -> str:
+    def _build_retry_prompt(original_prompt: str, invalid_response: str, parser_error: str) -> str:
         error = parser_error[:1200]
-        previous = invalid_rdf[:6000]
+        previous = invalid_response[:6000]
         return (
             f"{original_prompt}\n\n"
-            "The previous answer was not valid Turtle RDF when parsed with rdflib Graph.parse.\n"
-            f"Parser error:\n{error}\n\n"
-            "Regenerate the complete document so every statement conforms to the standard "
-            "RDF/Turtle grammar and the full response parses without errors with "
-            "rdflib.Graph.parse(format=\"turtle\"). Treat the parser error only as a "
-            "diagnostic: review and correct the entire RDF document, not only the reported "
-            "line. Return only the corrected Turtle RDF without markdown, comments, or "
-            "explanations.\n"
-            f"Previous invalid RDF:\n{previous}"
+            "The previous structured RDF JSON could not be converted to RDF.\n"
+            f"Validation error:\n{error}\n\n"
+            "Return the complete corrected JSON object using the required triples schema. "
+            "Every triple needs subject, predicate, object, and object_type. Return JSON only, "
+            "without Turtle, markdown, comments, or explanations.\n"
+            f"Previous invalid response:\n{previous}"
         )
 
     def _log(self, key: str, event: str, payload: dict[str, Any]) -> None:

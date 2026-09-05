@@ -119,4 +119,4 @@ The service listens on `http://127.0.0.1:5000`.
 
 - `missing_model` in `/health`: run `ollama pull llama3.1:8b`.
 - `Failed to generate response from model`: check that Ollama is running and `OLLAMA_API_URL` points to it.
-- `RDF parsing failed`: the model did not return valid Turtle after the configured attempts. Try a smaller input, a stricter prompt, or a higher `OLLAMA_NUM_PREDICT`.
+- `RDF parsing failed`: the model did not return valid structured triples after the configured attempts. Inspect `details`, reduce the input, or increase `OLLAMA_NUM_PREDICT` if the JSON was truncated.

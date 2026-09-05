@@ -29,8 +29,7 @@ def test_analyze_logs_request_lifecycle_with_idempotence_key(tmp_path):
         ):
             return {
                 "response": (
-                    "<http://example.org/s> <http://example.org/p> "
-                    "<http://example.org/o> ."
+                    "<http://example.org/s> <http://example.org/p> <http://example.org/o> ."
                 )
             }
 
@@ -137,16 +136,11 @@ def test_analyze_retries_until_rdf_is_valid():
 
     generation = response.generation
     assert generation is not None
-    assert (
-        generation["response"]
-        == "<http://example.org/s> <http://example.org/p> <http://example.org/o> ."
-    )
+    assert "ns1:s ns1:p ns1:o" in generation["response"]
     assert generation["rdf_validation_attempts"] == 2
     assert len(ollama.prompts) == 2
-    assert "previous answer was not valid Turtle RDF" in ollama.prompts[1]
-    assert "Previous invalid RDF:\nnot rdf" in ollama.prompts[1]
-    assert "every statement conforms to the standard RDF/Turtle grammar" in ollama.prompts[1]
-    assert "correct the entire RDF document" in ollama.prompts[1]
+    assert "previous structured RDF JSON" in ollama.prompts[1]
+    assert "Previous invalid response:\nnot rdf" in ollama.prompts[1]
 
 
 def test_analyze_retries_when_rdf_has_only_prefixes():

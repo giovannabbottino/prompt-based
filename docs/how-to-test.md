@@ -33,3 +33,9 @@ python -m pytest tests/integration/test_app_requests.py
   `requirements-dev.txt`.
 - Pytest writes temporary files under `.pytest-runtime` through the configured `--basetemp`.
 - Integration tests mock external generation calls; Ollama does not need to be running for the test suite.
+
+## Structured RDF checks
+
+`tests/unit/test_structured_rdf.py` checks graph serialization and required fields.
+Client tests check schema forwarding; service tests cover validation retries.
+Prompt tests check the JSON contract. Run the full suite after changing these layers.

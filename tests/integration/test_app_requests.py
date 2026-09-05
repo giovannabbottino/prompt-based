@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from rdflib import Graph, URIRef
 
 from prompt_based.app import create_app
 from prompt_based.infrastructure import prompt_repository
@@ -13,7 +14,18 @@ def ollama_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     sample_response = {
         "model": "llama3.1:8b",
         "created_at": "2024-01-01T00:00:00Z",
-        "response": "@prefix ex: <http://example.org/> .\nex:s ex:p ex:o .",
+        "response": json.dumps(
+            {
+                "triples": [
+                    {
+                        "subject": "kg:subject",
+                        "predicate": "kg:related_to",
+                        "object": "kg:object",
+                        "object_type": "resource",
+                    }
+                ]
+            }
+        ),
         "thinking": "analysis",
         "done": True,
         "done_reason": "stop",
@@ -86,9 +98,15 @@ def test_analyze_request_flow(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["text"] == "Integration text"
-    assert data["rdf"] == "@prefix ex: <http://example.org/> .\nex:s ex:p ex:o ."
+    graph = Graph().parse(data=data["rdf"], format="turtle")
+    assert (
+        URIRef("https://example.org/wikidata-description/subject"),
+        URIRef("https://example.org/wikidata-description/related_to"),
+        URIRef("https://example.org/wikidata-description/object"),
+    ) in graph
 
     assert "Integration text" in capture["payload"]["prompt"]
+    assert capture["payload"]["format"]["required"] == ["triples"]
 
     assert csv_path.exists()
     csv_text = csv_path.read_text(encoding="utf-8")
@@ -130,4 +148,4 @@ def test_analyze_placeholder_is_replaced(
 
         assert resp.status_code == 200
         assert resp.get_json()["text"] == "XYZ"
-        assert resp.get_json()["rdf"] == "@prefix ex: <http://example.org/> .\nex:s ex:p ex:o ."
+        assert "kg:subject kg:related_to kg:object" in resp.get_json()["rdf"]

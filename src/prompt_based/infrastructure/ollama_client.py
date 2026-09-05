@@ -10,7 +10,8 @@ from typing import Any
 import requests
 from requests import Response
 
-from ..domain.rdf_validation import rdf_validation_result
+from ..domain.rdf_validation import validate_rdf
+from ..domain.structured_rdf import RDF_TRIPLES_SCHEMA, model_response_to_turtle
 
 
 def _env_value(name: str, default: str | None = None) -> str | None:
@@ -133,6 +134,7 @@ class OllamaClient:
             "prompt": prompt,
             # Disable streaming to ensure we receive a single JSON object we can log.
             "stream": False,
+            "format": RDF_TRIPLES_SCHEMA,
         }
         options_payload = self.config.options.to_payload()
         if options_payload:
@@ -214,7 +216,11 @@ class OllamaClient:
         ]
         write_header = not csv_path.exists()
         response_text = str(data.get("response") or "")
-        rdf_valid, rdf_note = rdf_validation_result(response_text)
+        try:
+            validate_rdf(model_response_to_turtle(response_text))
+            rdf_valid, rdf_note = True, ""
+        except Exception as exc:
+            rdf_valid, rdf_note = False, str(exc)
         with csv_path.open("a", encoding="utf-8", newline="") as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
             if write_header:

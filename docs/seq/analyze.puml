@@ -1,70 +1,51 @@
 @startuml
-actor User
-boundary ClientApp as Client
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 14
+skinparam ArrowColor #375A7F
+skinparam sequenceParticipantBackgroundColor #EAF1F8
+skinparam activityBackgroundColor #EAF1F8
+skinparam activityBorderColor #375A7F
+skinparam activityDiamondBackgroundColor #FFF3D6
+title Prompt-based: POST /analyze
+actor Client
+control "Analyze controller" as API
+control "Application service" as Service
+participant "Ollama /api/generate" as LLM
+control "Structured RDF converter / RDFLib" as RDF
+Client -> API: POST /analyze (text, max_rdf_attempts?, options?)
+API -> API: Validate fields and trim text
+API -> Service: AnalyzeRequest
+Service -> Service: Load prompt files; start correlated event log
+Service -> Service: Insert text into system and few-shot prompts
 
-box "Flask App" #EFEFEF
-  control "Analyze Controller" as Controller
-  control "KnowledgeGraphService" as Service
-  entity "PromptRepository" as Repo
-  control "OllamaClient" as OC
-end box
-
-collections "Prompt files\n(prompt/)" as PromptFiles
-database "CSV log\n(OLLAMA_CSV_PATH)" as CSV
-boundary "Ollama /api/generate" as OA
-control "rdflib Graph.parse\n(Turtle validation)" as RDF
-
-User -> Client: Request analysis
-Client -> Controller ++: POST /analyze {text, prompt_name?, system_prompt_name?, max_rdf_attempts?}
-note right of Controller
-payload example:
-{
-  "text": "Alice knows Bob.",
-  "prompt_name": "prompts/few-shot.txt",
-  "system_prompt_name": "system/knowledge_graph.txt",
-  "max_rdf_attempts": 3
-}
+loop Up to max_rdf_attempts (clamped to 1-3), stop on success
+  Service -> LLM: Generate RDF triples with JSON schema
+  note right of LLM
+    JSON schema constrains the RDF response.
+    CSV records the raw model output.
+  end note
+  LLM --> Service: Structured triples JSON
+  Service -> RDF: Validate fields, identifiers and literal metadata
+  RDF -> RDF: Normalize kg names; create RDF terms and Graph
+  RDF -> RDF: Serialize Turtle; parse and check graph postconditions
+  alt Valid graph
+    RDF --> Service: Validated Turtle string
+    Service --> API: AnalyzeResponse
+    API --> Client: HTTP 200 (text, rdf)
+  else Invalid response and attempts remain
+    RDF --> Service: Validation error
+    Service -> Service: Add previous output and error to retry prompt/history
+  else Attempts exhausted
+    RDF --> Service: Validation error
+    Service --> API: RDFValidationError
+    API --> Client: HTTP 422 (error, attempts, details)
+  end
+end
+note over Service, RDF
+  Bundled clients request JSON; custom clients may supply valid legacy Turtle.
+  RDF regeneration reuses existing grounding evidence.
+  Request events record validation outcomes when logging is configured.
 end note
-
-Controller -> Controller: validate text present
-Controller -> Service ++: AnalyzeRequest(text, prompt names, max_rdf_attempts)
-
-Service -> Repo ++: load system prompt
-Repo -> PromptFiles: read system/knowledge_graph.txt
-Repo --> Service --: system prompt text
-
-Service -> Repo ++: load few-shot prompt
-Repo -> PromptFiles: read prompts/few-shot.txt
-Repo --> Service --: prompt template text
-
-Service -> Service: replace ${USER_TEXT} with input text
-
-Service -> OC ++: generate(system_prompt, prompt, prompt_name, input_text)
-note right of OC
-POST to Ollama:
-- model: OLLAMA_MODEL
-- system: system prompt
-- prompt: few-shot prompt with input text
-- options: OLLAMA_* generation options
-- stream: false
-end note
-
-OC -> OA ++: POST /api/generate
-OA --> OC --: JSON payload with response RDF
-
-OC -> CSV ++: append row with prompt, input, response, metrics
-CSV --> OC --: logged
-OC --> Service --: generation payload
-
-Service -> Service: extract RDF text without local repair
-Service -> RDF ++: parse(candidate, format="turtle")
-RDF --> Service --: valid Turtle
-
-Service -> Service: set generation["response"] to validated RDF
-Service --> Controller --: AnalyzeResponse
-
-Controller -> Controller: rdf_output = response.generation["response"]
-Controller --> Client --: 200 {"text": input_text, "rdf": rdf_output}
-Client --> User: Show RDF result
-
 @enduml
