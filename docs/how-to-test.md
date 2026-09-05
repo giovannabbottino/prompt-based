@@ -1,7 +1,7 @@
 # How to test
 
 Tests are organized by scope:
-- `tests/unit/` for service behavior, prompt substitution, RDF validation, retries, and repair logic.
+- `tests/unit/` for service behavior, prompt substitution, strict RDF validation, same-model retries, and RDFLib validation of both few-shot examples.
 - `tests/integration/` for request flows through the Flask app factory with mocked Ollama calls and temporary prompt files.
 
 ## Run all tests
@@ -33,3 +33,9 @@ python -m pytest tests/integration/test_app_requests.py
   `requirements-dev.txt`.
 - Pytest writes temporary files under `.pytest-runtime` through the configured `--basetemp`.
 - Integration tests mock external generation calls; Ollama does not need to be running for the test suite.
+
+## Structured RDF checks
+
+`tests/unit/test_structured_rdf.py` checks graph serialization and required fields.
+Client tests check schema forwarding; service tests cover validation retries.
+Prompt tests check the JSON contract. Run the full suite after changing these layers.

@@ -1,11 +1,12 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask
 
 from .application.services import KnowledgeGraphService
 from .controllers.analyze_controller import create_analyze_blueprint
-from .infrastructure import OllamaClient, OllamaClientConfig, PromptRepository
+from .infrastructure import OllamaClient, OllamaClientConfig, PromptRepository, RequestLogger
 
 DEFAULT_PROMPT_NAME = "prompts/few-shot.txt"
 DEFAULT_SYSTEM_PROMPT_NAME = "system/knowledge_graph.txt"
@@ -22,17 +23,24 @@ def create_app() -> Flask:
 
     ollama_config = OllamaClientConfig.from_env()
     ollama_client = OllamaClient(config=ollama_config)
+    analyze_log_path = os.getenv("ANALYZE_LOG_PATH", "data/analyze_log.jsonl")
+    request_logger = RequestLogger(Path(analyze_log_path)) if analyze_log_path else None
 
     service = KnowledgeGraphService(
         prompt_repository,
         default_prompt=env_default_prompt,
         default_system_prompt=env_default_system_prompt,
         ollama_client=ollama_client,
+        request_logger=request_logger,
     )
     app.register_blueprint(create_analyze_blueprint(service))
 
     return app
 
 
-if __name__ == "__main__":
+def main() -> None:
     create_app().run(host="127.0.0.1", port=5000, debug=True)
+
+
+if __name__ == "__main__":
+    main()
