@@ -5,7 +5,11 @@ Do not return a triples array, Markdown fences, comments, or explanations.
 
 Rules:
 - Preserve the entities, concepts, and relationships stated in the source text.
-- Include every prefix declaration used by the graph.
+- The rdf string must start with these three prefix declarations, in this order, even if a namespace is unused:
+  @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+  @prefix wd: <http://www.wikidata.org/entity/> .
+  @prefix kg: <https://example.org/wikidata-description/> .
+- Declare any additional prefixes used by the graph after these three.
 - Add an rdfs:label literal with a language tag to every subject and object resource.
 - Use rdf:type for type relationships and concise kg:snake_case predicates for other relationships.
 - Include at least one semantic relationship beyond labels.

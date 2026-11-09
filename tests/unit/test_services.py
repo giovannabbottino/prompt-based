@@ -57,7 +57,6 @@ def test_analyze_logs_request_lifecycle_with_idempotence_key(tmp_path):
     [
         ("Example Prompt", "Example Prompt\n\nUser: Hello\nAssistant:"),
         ("Prompt with ${USER_TEXT} inside", "Prompt with Hello inside"),
-        ("Prompt with ${Text_TEXT} inside", "Prompt with Hello inside"),
     ],
 )
 def test_analyze_builds_payload(prompt, message):
@@ -66,9 +65,7 @@ def test_analyze_builds_payload(prompt, message):
     response = make_service(client, prompt=prompt).analyze(AnalyzeRequest(text="Hello"))
 
     assert response.input_text == "Hello"
-    assert response.prompt_name == "example.txt"
     client.generate.assert_called_once_with(system_prompt=prompt, prompt=message)
-    assert response.message_for_model == message
 
 
 def test_analyze_validates_once_before_logging_each_attempt(tmp_path, monkeypatch):
@@ -106,7 +103,7 @@ def test_analyze_validates_once_before_logging_each_attempt(tmp_path, monkeypatc
     assert succeeded["generation"] == raw_generation
     assert succeeded["rdf"] == response.generation["response"] == VALID_RDF
     assert raw_generation["response"] == VALID_RESPONSE
-    assert response.generation["rdf_validation_attempts"] == 2
+    assert succeeded["attempt"] == 2
     retry = client.generate.call_args_list[1].kwargs["prompt"]
     assert "Validation error:" in retry
     assert invalid in retry

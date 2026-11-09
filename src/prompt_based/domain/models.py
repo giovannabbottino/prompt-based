@@ -13,9 +13,5 @@ class AnalyzeRequest:
 
 @dataclass(frozen=True)
 class AnalyzeResponse:
-    prompt_name: str
-    system_prompt_name: str
-    prompt: str
     input_text: str
-    message_for_model: str
     generation: dict[str, Any]
