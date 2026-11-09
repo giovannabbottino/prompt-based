@@ -1,52 +1,13 @@
-# Prompt behavior
+# Prompts
 
-The prompt-based pipeline asks Ollama for structured RDF triples rather than Turtle syntax. The
-bundled client sends the same JSON Schema used by the hybrid and ontology pipelines through
-Ollama's `format` field.
+`prompt/system/knowledge_graph.txt` defines extraction rules; `prompt/prompts/few-shot.txt` provides three examples and the `${USER_TEXT}` placeholder. The examples cover a person, a place, and a historical event; an organization, an AI model, and its application domain; and a scientific discovery, people, a substance, and a place. Select the default templates in `.env`.
 
-## Model response
-
-The model returns one object with a non-empty `triples` array:
+The model must return exactly one JSON object with an `rdf` string:
 
 ```json
-{
-  "triples": [
-    {
-      "subject": "kg:alice",
-      "predicate": "rdfs:label",
-      "object": "Alice",
-      "object_type": "literal",
-      "language": "en"
-    },
-    {
-      "subject": "kg:alice",
-      "predicate": "kg:manages",
-      "object": "kg:research_laboratory",
-      "object_type": "resource"
-    }
-  ]
-}
+{"rdf": "@prefix kg: <https://example.org/kg/> .\nkg:alice kg:knows kg:bob ."}
 ```
 
-Every item requires `subject`, `predicate`, `object`, and `object_type`. Literal objects may have
-either `language` or `datatype`. Supported identifiers use `wd:`, `kg:`, `rdf:`, `rdfs:`, `xsd:`,
-or `owl:`. Bare resource names and unsafe `kg:` local names are normalized deterministically.
+The client sends a schema requiring this shape. The service decodes the JSON and validates the Turtle once with RDFLib before logging. Empty RDF and graphs containing only labels fail validation. The RDF is returned with outer whitespace trimmed, without syntax repair or reserialization. Syntax validation does not verify factual accuracy.
 
-## RDF construction
-
-The application validates the structured response, converts every item into an RDFLib term, adds
-the triples to an `rdflib.Graph`, binds the known namespaces, and calls
-`graph.serialize(format="turtle")`. The API therefore continues to return RDF/Turtle as a string,
-but the model is no longer responsible for Turtle punctuation or prefix declarations.
-
-The serialized result must contain at least one semantic relationship in addition to labels. If
-structured validation fails, the model receives the validation error and its previous response and
-may retry up to `max_rdf_attempts`.
-
-## Editing guidelines
-
-- Keep `${USER_TEXT}` in the user prompt.
-- Keep the structured fields identical across all three pipelines.
-- Keep labels mandatory for resource subjects and objects.
-- Keep `object_type` restricted to `resource` and `literal`.
-- Keep the application serializer authoritative for final Turtle syntax.
+When editing prompts, keep `${USER_TEXT}`, require complete Turtle prefix declarations, labels for resources, and relationships supported by the source text. Use descriptive `kg:` identifiers when a Wikidata QID is uncertain. Escape quotes and newlines in the JSON string. Extra keys, triples arrays, Markdown fences, and prose are rejected.

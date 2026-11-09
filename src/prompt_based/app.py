@@ -23,8 +23,10 @@ def create_app() -> Flask:
 
     ollama_config = OllamaClientConfig.from_env()
     ollama_client = OllamaClient(config=ollama_config)
-    analyze_log_path = os.getenv("ANALYZE_LOG_PATH", "data/analyze_log.jsonl")
+    analyze_log_path = os.getenv("ANALYZE_LOG_PATH", "logs/analyze_log.jsonl")
     request_logger = RequestLogger(Path(analyze_log_path)) if analyze_log_path else None
+    generation_log_path = os.getenv("OLLAMA_JSONL_PATH", "logs/ollama_responses.jsonl")
+    generation_logger = RequestLogger(generation_log_path)
 
     service = KnowledgeGraphService(
         prompt_repository,
@@ -32,6 +34,7 @@ def create_app() -> Flask:
         default_system_prompt=env_default_system_prompt,
         ollama_client=ollama_client,
         request_logger=request_logger,
+        generation_logger=generation_logger,
     )
     app.register_blueprint(create_analyze_blueprint(service))
 
