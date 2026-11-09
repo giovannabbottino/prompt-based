@@ -1,41 +1,13 @@
-# How to test
+# Tests and quality checks
 
-Tests are organized by scope:
-- `tests/unit/` for service behavior, prompt substitution, strict RDF validation, same-model retries, and RDFLib validation of both few-shot examples.
-- `tests/integration/` for request flows through the Flask app factory with mocked Ollama calls and temporary prompt files.
-
-## Run all tests
-
-Run commands from `prompt-based/`.
+Run from `prompt-based/` with the virtual environment active:
 
 ```bash
-python -m pip install -r requirements-dev.txt
+python -m pip install -e ".[dev]"
+python -m ruff format --check .
+python -m ruff check .
+python -m pyright
 python -m pytest
 ```
 
-## Run a specific scope
-
-```bash
-python -m pytest tests/unit
-python -m pytest tests/integration
-```
-
-## Useful focused runs
-
-```bash
-python -m pytest tests/unit/test_services.py
-python -m pytest tests/integration/test_app_requests.py
-```
-
-## Notes
-
-- The project uses the standard `src` package layout and is installed in editable mode by
-  `requirements-dev.txt`.
-- Pytest writes temporary files under `.pytest-runtime` through the configured `--basetemp`.
-- Integration tests mock external generation calls; Ollama does not need to be running for the test suite.
-
-## Structured RDF checks
-
-`tests/unit/test_structured_rdf.py` checks graph serialization and required fields.
-Client tests check schema forwarding; service tests cover validation retries.
-Prompt tests check the JSON contract. Run the full suite after changing these layers.
+Tests cover prompts, validation, retries, JSONL logging, and API requests. Ollama calls are mocked; the model does not need to be running. To run one scope, use `python -m pytest tests/unit` or `python -m pytest tests/integration`.

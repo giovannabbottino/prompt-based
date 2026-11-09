@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -7,6 +8,11 @@ from prompt_based.application.services import KnowledgeGraphService, RDFValidati
 from prompt_based.domain.models import AnalyzeRequest
 from prompt_based.infrastructure.prompt_repository import PromptRepository
 from prompt_based.infrastructure.request_logger import RequestLogger
+
+VALID_RDF = "@prefix kg: <https://example.org/wikidata-description/> .\nkg:alice kg:knows kg:bob ."
+
+
+VALID_RESPONSE = json.dumps({"rdf": VALID_RDF})
 
 
 class DummyPromptRepo(PromptRepository):
@@ -18,262 +24,139 @@ class DummyPromptRepo(PromptRepository):
         return self.prompt_text
 
 
-def test_analyze_logs_request_lifecycle_with_idempotence_key(tmp_path):
-    class StubOllamaClient:
-        def generate(
-            self,
-            system_prompt: str,
-            prompt: str,
-            prompt_name: str | None = None,
-            input_text: str | None = None,
-        ):
-            return {
-                "response": (
-                    "<http://example.org/s> <http://example.org/p> <http://example.org/o> ."
-                )
-            }
-
-    log_path = tmp_path / "analyze.jsonl"
-    service = KnowledgeGraphService(
-        DummyPromptRepo(prompt_text="Build RDF for ${USER_TEXT}"),
+def make_service(client, prompt="Build RDF for ${USER_TEXT}", **kwargs):
+    return KnowledgeGraphService(
+        DummyPromptRepo(prompt),
         default_prompt="example.txt",
         default_system_prompt="system.txt",
-        ollama_client=StubOllamaClient(),
-        request_logger=RequestLogger(log_path),
+        ollama_client=client,
+        **kwargs,
     )
+
+
+def test_analyze_logs_request_lifecycle_with_idempotence_key(tmp_path):
+    client = Mock()
+    client.generate.return_value = {"response": VALID_RESPONSE}
+    log_path = tmp_path / "analyze.jsonl"
+    service = make_service(client, request_logger=RequestLogger(log_path))
 
     service.analyze(AnalyzeRequest(text="Hello", idempotence_key="request-123"))
 
-    entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    entries = [json.loads(line) for line in log_path.read_text().splitlines()]
     assert {entry["idempotence_key"] for entry in entries} == {"request-123"}
     assert [entry["event"] for entry in entries] == [
         "analyze_started",
         "llm_rdf_request",
-        "llm_rdf_response",
         "rdf_validated",
         "analyze_completed",
     ]
 
 
-def test_analyze_builds_payload():
-    repo = DummyPromptRepo(prompt_text="Example Prompt")
-    service = KnowledgeGraphService(
-        repo, default_prompt="example.txt", default_system_prompt="system.txt"
-    )
-    request = AnalyzeRequest(
-        text="Hello world", prompt_name="example.txt", system_prompt_name="system.txt"
-    )
+@pytest.mark.parametrize(
+    ("prompt", "message"),
+    [
+        ("Example Prompt", "Example Prompt\n\nUser: Hello\nAssistant:"),
+        ("Prompt with ${USER_TEXT} inside", "Prompt with Hello inside"),
+        ("Prompt with ${Text_TEXT} inside", "Prompt with Hello inside"),
+    ],
+)
+def test_analyze_builds_payload(prompt, message):
+    client = Mock()
+    client.generate.return_value = {"response": VALID_RESPONSE}
+    response = make_service(client, prompt=prompt).analyze(AnalyzeRequest(text="Hello"))
 
-    response = service.analyze(request)
-
+    assert response.input_text == "Hello"
     assert response.prompt_name == "example.txt"
-    assert response.prompt == "Example Prompt"
-    assert response.input_text == "Hello world"
-    assert "User: Hello world" in response.message_for_model
-    assert response.message_for_model.startswith("Example Prompt")
+    client.generate.assert_called_once_with(system_prompt=prompt, prompt=message)
+    assert response.message_for_model == message
 
 
-def test_analyze_replaces_placeholder():
-    repo = DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside")
-    service = KnowledgeGraphService(
-        repo, default_prompt="example.txt", default_system_prompt="system.txt"
-    )
-    request = AnalyzeRequest(
-        text="Hello", prompt_name="example.txt", system_prompt_name="system.txt"
-    )
+def test_analyze_validates_once_before_logging_each_attempt(tmp_path, monkeypatch):
+    import prompt_based.application.services as services
 
-    response = service.analyze(request)
+    invalid = json.dumps({"rdf": "invalid Turtle"})
+    raw_generation = {"response": VALID_RESPONSE, "model": "llama3.1:8b", "eval_count": 13}
+    client = Mock()
+    client.generate.side_effect = [{"response": invalid}, raw_generation]
+    validate = Mock(wraps=services.validate_rdf)
+    monkeypatch.setattr(services, "validate_rdf", validate)
+    log_path = tmp_path / "generations.jsonl"
+    logger = RequestLogger(log_path)
+    write = logger.log
 
-    assert response.message_for_model == "Prompt with Hello inside"
+    def record_after_validation(**kwargs):
+        attempt = kwargs["payload"]["attempt"]
+        assert validate.call_count == attempt
+        write(**kwargs)
 
+    monkeypatch.setattr(logger, "log", record_after_validation)
+    service = make_service(client, generation_logger=logger)
+    response = service.analyze(AnalyzeRequest(text="Alice knows Bob.", idempotence_key="key"))
 
-def test_analyze_replaces_legacy_text_placeholder():
-    repo = DummyPromptRepo(prompt_text="Prompt with ${Text_TEXT} inside")
-    service = KnowledgeGraphService(
-        repo, default_prompt="example.txt", default_system_prompt="system.txt"
-    )
-    request = AnalyzeRequest(
-        text="Hello", prompt_name="example.txt", system_prompt_name="system.txt"
-    )
-
-    response = service.analyze(request)
-
-    assert response.message_for_model == "Prompt with Hello inside"
-
-
-def test_analyze_retries_until_rdf_is_valid():
-    class StubOllamaClient:
-        def __init__(self):
-            self.responses = [
-                "not rdf",
-                "<http://example.org/s> <http://example.org/p> <http://example.org/o> .",
-            ]
-            self.prompts = []
-
-        def generate(
-            self,
-            system_prompt: str,
-            prompt: str,
-            prompt_name: str | None = None,
-            input_text: str | None = None,
-        ):
-            self.prompts.append(prompt)
-            return {"response": self.responses.pop(0)}
-
-    repo = DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside")
-    ollama = StubOllamaClient()
-    service = KnowledgeGraphService(
-        repo,
-        default_prompt="example.txt",
-        default_system_prompt="system.txt",
-        ollama_client=ollama,
-    )
-    request = AnalyzeRequest(
-        text="Hello", prompt_name="example.txt", system_prompt_name="system.txt", max_rdf_attempts=3
-    )
-
-    response = service.analyze(request)
-
-    generation = response.generation
-    assert generation is not None
-    assert "ns1:s ns1:p ns1:o" in generation["response"]
-    assert generation["rdf_validation_attempts"] == 2
-    assert len(ollama.prompts) == 2
-    assert "previous structured RDF JSON" in ollama.prompts[1]
-    assert "Previous invalid response:\nnot rdf" in ollama.prompts[1]
-
-
-def test_analyze_retries_when_rdf_has_only_prefixes():
-    class StubOllamaClient:
-        def __init__(self):
-            self.responses = [
-                "@prefix kg: <https://example.org/wikidata-description/> .",
-                "@prefix kg: <https://example.org/wikidata-description/> .\n"
-                "kg:mango kg:is kg:fruit .",
-            ]
-            self.prompts = []
-
-        def generate(self, system_prompt, prompt, prompt_name=None, input_text=None):
-            self.prompts.append(prompt)
-            return {"response": self.responses.pop(0)}
-
-    service = KnowledgeGraphService(
-        DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside"),
-        default_prompt="example.txt",
-        default_system_prompt="system.txt",
-        ollama_client=StubOllamaClient(),
-    )
-
-    response = service.analyze(
-        AnalyzeRequest(
-            text="Mango is a fruit.",
-            prompt_name="example.txt",
-            system_prompt_name="system.txt",
-            max_rdf_attempts=3,
-        )
-    )
-
-    generation = response.generation
-    assert generation is not None
-    assert generation["rdf_validation_attempts"] == 2
-    assert "kg:mango kg:is kg:fruit" in generation["response"]
+    entries = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(entries) == 2
+    assert {entry["idempotence_key"] for entry in entries} == {"key"}
+    failed, succeeded = [entry["payload"] for entry in entries]
+    assert failed["rdf_valid"] is False
+    assert failed["rdf_note"]
+    assert failed["rdf"] is None
+    assert failed["generation"]["response"] == invalid
+    assert succeeded["rdf_valid"] is True
+    assert succeeded["rdf_note"] == ""
+    assert succeeded["generation"] == raw_generation
+    assert succeeded["rdf"] == response.generation["response"] == VALID_RDF
+    assert raw_generation["response"] == VALID_RESPONSE
+    assert response.generation["rdf_validation_attempts"] == 2
+    retry = client.generate.call_args_list[1].kwargs["prompt"]
+    assert "Validation error:" in retry
+    assert invalid in retry
 
 
 @pytest.mark.parametrize(
-    "invalid_rdf",
+    "invalid",
     [
-        (
-            "@prefix ex: <http://example.org/kg/> .\n"
-            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n"
-            'ex:coqa rdfs:label ""CoQA"" ;\n'
-            "    ex:related ex:dataset ."
-        ),
-        (
-            "@prefix ex: <http://example.org/kg/> .\n"
-            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n"
-            'ex:valid rdfs:label "Valid" ;\n'
-            "    ex:related ex:dataset .\n\n"
-            'ex:cut rdfs:label "Cut'
-        ),
-        (
-            "@prefix kg: <https://example.org/wikidata-description/> .\n"
-            'kg:mustang kg:production_year "1964"^^xsd:gYear .'
-        ),
-        (
-            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
-            "@prefix wd: <http://www.wikidata.org/entity/> .\n"
-            "@prefix kg: <https://example.org/wikidata-description/> .\n"
-            'wd:Q? rdfs:label "calendar date"@en ; kg:is kg:date .\n'
-            "."
-        ),
-        (
-            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
-            "@prefix kg: <https://example.org/wikidata-description/> .\n"
-            'kg:bank rdfs:label "Bank"@en ;\n'
-            "  kg:is kg:financial_institution ;\n"
-            "  kg:accepts_deposits ;\n"
-            "  kg:makes_loans ."
-        ),
+        "not rdf",
+        '{"triples": []}',
+        '"RDF inside a JSON string"',
+        f"```json\n{VALID_RESPONSE}\n```",
+        json.dumps({"rdf": "invalid Turtle"}),
+        json.dumps({"rdf": ""}),
+        json.dumps({"rdf": VALID_RDF, "extra": True}),
+        "@prefix kg: <https://example.org/kg/> .",
+        '<https://example.org/alice> <http://www.w3.org/2000/01/rdf-schema#label> "Alice" .',
+        "@prefix kg: <https://example.org/kg/> . kg:a kg:b ; kg:c .",
     ],
 )
-def test_analyze_rejects_invalid_rdf_without_local_repair(invalid_rdf):
-    class StubOllamaClient:
-        def generate(
-            self,
-            system_prompt: str,
-            prompt: str,
-            prompt_name: str | None = None,
-            input_text: str | None = None,
-        ):
-            return {"response": invalid_rdf}
+def test_analyze_rejects_invalid_responses_and_logs_exhausted_attempts(tmp_path, invalid):
+    client = Mock()
+    client.generate.return_value = {"response": invalid}
+    log_path = tmp_path / "generations.jsonl"
+    service = make_service(client, generation_logger=RequestLogger(log_path))
 
-    service = KnowledgeGraphService(
-        DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside"),
-        default_prompt="example.txt",
-        default_system_prompt="system.txt",
-        ollama_client=StubOllamaClient(),
-    )
+    with pytest.raises(RDFValidationError) as error:
+        service.analyze(AnalyzeRequest(text="Hello", max_rdf_attempts=2))
 
-    with pytest.raises(RDFValidationError):
-        service.analyze(
-            AnalyzeRequest(
-                text="Hello",
-                prompt_name="example.txt",
-                system_prompt_name="system.txt",
-                max_rdf_attempts=1,
-            )
-        )
+    assert error.value.attempts == 2
+    assert error.value.last_error
+    assert client.generate.call_count == 2
+    entries = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(entries) == 2
+    assert all(entry["payload"]["rdf_valid"] is False for entry in entries)
 
 
-def test_analyze_retries_instead_of_dropping_complete_invalid_blocks():
-    class StubOllamaClient:
-        def __init__(self):
-            self.responses = [
-                (
-                    "@prefix kg: <https://example.org/kg/> .\n"
-                    "kg:first kg:is kg:valid .\n\n"
-                    "kg:second kg:on kg:date extra ."
-                ),
-                (
-                    "@prefix kg: <https://example.org/kg/> .\n"
-                    "kg:first kg:is kg:valid .\n"
-                    "kg:second kg:on kg:date ."
-                ),
-            ]
+@pytest.mark.parametrize(("requested", "expected"), [(-1, 1), (0, 1), (1, 1), (3, 3), (8, 3)])
+def test_analyze_clamps_attempts(requested, expected):
+    client = Mock()
+    client.generate.return_value = {"response": "invalid"}
+    with pytest.raises(RDFValidationError) as error:
+        make_service(client).analyze(AnalyzeRequest(text="Hello", max_rdf_attempts=requested))
+    assert error.value.attempts == expected
+    assert client.generate.call_count == expected
 
-        def generate(self, system_prompt, prompt, prompt_name=None, input_text=None):
-            return {"response": self.responses.pop(0)}
 
-    service = KnowledgeGraphService(
-        DummyPromptRepo(prompt_text="Prompt with ${USER_TEXT} inside"),
-        default_prompt="example.txt",
-        default_system_prompt="system.txt",
-        ollama_client=StubOllamaClient(),
-    )
-
-    response = service.analyze(AnalyzeRequest(text="Two senses.", max_rdf_attempts=2))
-
-    generation = response.generation
-    assert generation is not None
-    assert "kg:second" in generation["response"]
-    assert generation["rdf_validation_attempts"] == 2
+def test_analyze_succeeds_when_generation_log_cannot_be_written(tmp_path):
+    client = Mock()
+    client.generate.return_value = {"response": VALID_RESPONSE}
+    service = make_service(client, generation_logger=RequestLogger(tmp_path))
+    response = service.analyze(AnalyzeRequest(text="Alice knows Bob."))
+    assert response.generation["response"] == VALID_RDF

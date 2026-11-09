@@ -1,123 +1,42 @@
-
-# Analyze
+# API
 
 ## `GET /health`
 
-Checks the API and the configured Ollama model.
-
-Example response when the model is available:
-
-```json
-{
-  "status": "ok",
-  "ollama": {
-    "status": "ok",
-    "model": "llama3.1:8b"
-  }
-}
-```
-
-If Ollama is reachable but the configured model is missing, `ollama.status` is `missing_model` and the response includes the pull command.
+Returns `200` when Ollama and the configured model are available; otherwise `503`. The body includes `status` and `ollama` with availability details.
 
 ## `POST /analyze`
 
-Builds a prompt from the input text, calls Ollama for structured triples, constructs and serializes an RDFLib graph, logs the generation metadata to CSV and lifecycle events to JSONL, and returns the validated Turtle string.
+Accepts a JSON object. Only `text` is required.
 
-### Request body
+```json
+{"text": "Alice knows Bob."}
+```
+
+| Field | Description |
+| --- | --- |
+| `text` | Non-empty source text. Outer whitespace is trimmed. |
+| `prompt_name` | Optional template path under `prompt/`; defaults to the setting in `.env`. |
+| `system_prompt_name` | Optional system prompt path under `prompt/`; defaults to the setting in `.env`. |
+| `max_rdf_attempts` | Optional integer, clamped to 1-3; defaults to 3. |
+| `idempotence_key` | Optional log correlation key; generated when omitted. Does not deduplicate requests. |
+
+Success (`200`):
 
 ```json
 {
   "text": "Alice knows Bob.",
-  "idempotence_key": "request-123",
-  "prompt_name": "prompts/few-shot.txt",
-  "system_prompt_name": "system/knowledge_graph.txt",
-  "max_rdf_attempts": 3
+  "rdf": "@prefix kg: <https://example.org/kg/> .\nkg:alice kg:knows kg:bob ."
 }
 ```
 
-Fields:
+The service validates the [model response](prompt.md), records the result in JSONL, and returns the extracted Turtle. Invalid output is retried with feedback using the same model.
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `text` | Yes | Source text to convert into a knowledge graph. |
-| `idempotence_key` | No | String used to correlate all JSONL events for this request. A UUID is generated when omitted. |
-| `prompt_name` | No | Prompt template path under `prompt/`. Defaults to `DEFAULT_PROMPT_NAME`. |
-| `system_prompt_name` | No | System prompt path under `prompt/`. Defaults to `DEFAULT_SYSTEM_PROMPT_NAME`. |
-| `max_rdf_attempts` | No | Number of RDF generation attempts. Values are clamped between 1 and 3. Default: `3`. Every retry uses the same model stage. |
+| Status | Cause |
+| --- | --- |
+| `400` | Invalid request fields or prompt path. |
+| `404` | Prompt file not found. |
+| `422` | Invalid model output after all attempts; includes `attempts` and `details`. |
+| `502` | Ollama request failed or model unavailable. |
+| `504` | Ollama request timed out. |
 
-Prompt paths are resolved under the local `prompt/` directory. Path traversal outside that directory is rejected.
-
-### Prompt construction
-
-The service loads both prompt files and then:
-
-- replaces `${USER_TEXT}` or `${Text_TEXT}` with `text`, when either placeholder is present;
-- otherwise appends the input as:
-
-```text
-User: <text>
-Assistant:
-```
-
-The default prompts require the same structured-triple JSON contract as the ontology and hybrid
-pipelines. The ontology prompt adds Wikidata-specific grounding instructions.
-
-### RDF validation and retry
-
-The bundled client requests structured JSON; the converter then applies these checks:
-
-- the response must contain a non-empty `triples` array;
-- identifiers and literal metadata are validated;
-- unsafe `kg:` local names are normalized to snake_case;
-- the triples are added to an RDFLib graph and serialized as Turtle.
-
-If structured validation fails and attempts remain, the same model stage is asked for corrected
-JSON. The serialized Turtle is parsed before it is returned.
-
-### Request-event log
-
-`ANALYZE_LOG_PATH` defaults to `data/analyze_log.jsonl`. Each line contains `timestamp`, `idempotence_key`, `event`, and `payload`. Logging is best-effort and does not fail an analysis if the log file cannot be written.
-
-### Example request
-
-```bash
-curl -X POST http://127.0.0.1:5000/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Alice knows Bob."}'
-```
-
-PowerShell:
-
-```powershell
-$body = @{
-  text = "Alice knows Bob."
-} | ConvertTo-Json
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://127.0.0.1:5000/analyze" `
-  -ContentType "application/json" `
-  -Body $body
-```
-
-### Success response
-
-```json
-{
-  "text": "Alice knows Bob.",
-  "rdf": "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix wd: <http://www.wikidata.org/entity/> .\n@prefix kg: <https://example.org/wikidata-description/> .\n\nkg:alice a kg:Person ;\n  rdfs:label \"Alice\"@en ;\n  kg:knows kg:bob .\n\nkg:bob a kg:Person ;\n  rdfs:label \"Bob\"@en ."
-}
-```
-
-### Error responses
-
-| Status | Cause | Response shape |
-|--------|-------|----------------|
-| `400` | Missing `text` or invalid prompt path | `{ "error": "..." }` |
-| `404` | Prompt file not found | `{ "error": "..." }` |
-| `502` | Ollama request failed or model is unavailable | `{ "error": "...", "details": "..." }` |
-| `422` | RDF could not be parsed after all attempts | `{ "error": "RDF parsing failed.", "attempts": 3, "details": "..." }` |
-
-See the [structured RDF contract](structured-rdf.md) for identifier normalization,
-literal metadata, and legacy custom-client compatibility, and the
-[pipeline diagrams](diagrams.md) for generation and retry boundaries.
+Errors include an `error` message. Configure the model and log paths in `.env`; see [.env.example](../.env.example).

@@ -79,10 +79,6 @@ def create_analyze_blueprint(service: AnalyzeService) -> Blueprint:
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
-        rdf_output: object | None = None
-        if response.generation:
-            rdf_output = response.generation.get("response")
-
-        return jsonify({"text": response.input_text, "rdf": rdf_output}), 200
+        return jsonify({"text": response.input_text, "rdf": response.generation["response"]}), 200
 
     return blueprint

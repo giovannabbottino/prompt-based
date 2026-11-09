@@ -16,14 +16,10 @@ def ollama_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         "created_at": "2024-01-01T00:00:00Z",
         "response": json.dumps(
             {
-                "triples": [
-                    {
-                        "subject": "kg:subject",
-                        "predicate": "kg:related_to",
-                        "object": "kg:object",
-                        "object_type": "resource",
-                    }
-                ]
+                "rdf": (
+                    "@prefix kg: <https://example.org/wikidata-description/> .\n"
+                    "kg:subject kg:related_to kg:object ."
+                )
             }
         ),
         "thinking": "analysis",
@@ -51,16 +47,17 @@ def ollama_mock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
         return DummyResponse()
 
-    csv_path = tmp_path / "ollama.csv"
-    monkeypatch.setenv("OLLAMA_CSV_PATH", str(csv_path))
+    log_path = tmp_path / "ollama.jsonl"
+    monkeypatch.setenv("OLLAMA_JSONL_PATH", str(log_path))
+    monkeypatch.setenv("ANALYZE_LOG_PATH", str(tmp_path / "analyze.jsonl"))
     monkeypatch.setattr("prompt_based.infrastructure.ollama_client.requests.post", fake_post)
 
-    return captured, sample_response, csv_path
+    return captured, sample_response, log_path
 
 
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ollama_mock):
-    captured, sample_response, csv_path = ollama_mock
+    captured, sample_response, log_path = ollama_mock
 
     prompt_dir = tmp_path / "prompt"
     prompt_dir.mkdir()
@@ -83,11 +80,11 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ollama_mock):
     app.config.update({"TESTING": True})
 
     with app.test_client() as client:
-        yield client, captured, sample_response, csv_path
+        yield client, captured, sample_response, log_path
 
 
 def test_analyze_request_flow(client):
-    client, capture, sample_response, csv_path = client
+    client, capture, sample_response, log_path = client
     payload = {
         "text": "Integration text",
         "prompt_name": "test_prompt.txt",
@@ -106,19 +103,23 @@ def test_analyze_request_flow(client):
     ) in graph
 
     assert "Integration text" in capture["payload"]["prompt"]
-    assert capture["payload"]["format"]["required"] == ["triples"]
+    assert capture["payload"]["format"]["required"] == ["rdf"]
+    assert data["rdf"] == json.loads(sample_response["response"])["rdf"]
 
-    assert csv_path.exists()
-    csv_text = csv_path.read_text(encoding="utf-8")
-    header = csv_text.splitlines()[0]
-    assert "rdf_valid" in header
-    assert "True" in csv_text
+    assert log_path.exists()
+    entries = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(entries) == 1
+    payload = entries[0]["payload"]
+    assert payload["rdf_valid"] is True
+    assert payload["generation"] == sample_response
+    assert payload["rdf"] == data["rdf"]
+    assert payload["input_text"] == "Integration text"
 
 
 def test_analyze_placeholder_is_replaced(
     ollama_mock, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    captured, sample_response, csv_path = ollama_mock
+    captured, sample_response, log_path = ollama_mock
     prompt_dir = tmp_path / "prompt2"
     prompt_dir.mkdir()
     (prompt_dir / "test_prompt.txt").write_text("Placeholder ${USER_TEXT}", encoding="utf-8")
@@ -149,3 +150,13 @@ def test_analyze_placeholder_is_replaced(
         assert resp.status_code == 200
         assert resp.get_json()["text"] == "XYZ"
         assert "kg:subject kg:related_to kg:object" in resp.get_json()["rdf"]
+
+
+def test_analyze_rejects_triples_array(client):
+    client, _, sample_response, log_path = client
+    sample_response["response"] = json.dumps({"triples": []})
+    response = client.post("/analyze", json={"text": "Hello", "max_rdf_attempts": 1})
+    assert response.status_code == 422
+    assert response.get_json()["attempts"] == 1
+    entry = json.loads(log_path.read_text())
+    assert entry["payload"]["rdf_valid"] is False

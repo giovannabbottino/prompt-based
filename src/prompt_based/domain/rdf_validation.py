@@ -1,22 +1,25 @@
+import json
+
 from rdflib import Graph
 from rdflib.namespace import RDFS
 
+RDF_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {"rdf": {"type": "string", "minLength": 1}},
+    "required": ["rdf"],
+    "additionalProperties": False,
+}
 
-def extract_rdf_text(response_text: str) -> str:
-    text = response_text.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()
-        if lines and lines[0].strip().startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip().startswith("```"):
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
 
-    rdf_markers = ("@prefix", "@base", "PREFIX", "BASE", "<", "_:")
-    starts = [idx for marker in rdf_markers if (idx := text.find(marker)) >= 0]
-    if starts:
-        text = text[min(starts) :].strip()
-    return text
+def parse_rdf_response(response_text: str) -> str:
+    """Extract Turtle from the model's JSON object without repairing its output."""
+    payload = json.loads(response_text)
+    if not isinstance(payload, dict) or set(payload) != {"rdf"}:
+        raise ValueError("Model response must be a JSON object containing only the 'rdf' field.")
+    rdf = payload["rdf"]
+    if not isinstance(rdf, str) or not rdf.strip():
+        raise ValueError("Model response field 'rdf' must be a non-empty string.")
+    return rdf.strip()
 
 
 def validate_rdf(rdf_text: str) -> None:
@@ -27,11 +30,3 @@ def validate_rdf(rdf_text: str) -> None:
         raise ValueError("RDF response contains no triples.")
     if not any(predicate != RDFS.label for _, predicate, _ in graph):
         raise ValueError("RDF response contains labels but no semantic relationships.")
-
-
-def rdf_validation_result(response_text: str) -> tuple[bool, str]:
-    try:
-        validate_rdf(extract_rdf_text(response_text))
-    except Exception as exc:  # rdflib raises parser-specific exception classes.
-        return False, str(exc)
-    return True, ""

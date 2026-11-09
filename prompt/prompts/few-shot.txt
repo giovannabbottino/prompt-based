@@ -1,49 +1,41 @@
-Extract a knowledge graph from the text below as structured RDF triples.
-
-Return exactly this JSON shape:
-{
-  "triples": [
-    {
-      "subject": "kg:resource_name",
-      "predicate": "rdfs:label",
-      "object": "Human-readable label",
-      "object_type": "literal",
-      "language": "en"
-    },
-    {
-      "subject": "kg:resource_name",
-      "predicate": "kg:relationship_name",
-      "object": "kg:other_resource",
-      "object_type": "resource"
-    }
-  ]
-}
+Extract a knowledge graph from the text below as a JSON object with an "rdf" string containing RDF/Turtle.
 
 Rules:
-- Return JSON only. Do not return RDF/Turtle, Markdown, prefix declarations, or explanations.
+- Return JSON only, with exactly one key: "rdf". Its value must be the complete Turtle graph as a string.
+- Escape newlines, quotes, and backslashes correctly in the JSON string.
+- Do not return a triples array, Markdown fences, comments, or explanations.
+- Include all required prefix declarations.
 - Represent the entities, concepts, and relationships stated in the text.
-- Give every resource an `rdfs:label` using wording from the text and language `en`.
-- Use a reliable Wikidata QID as `wd:Q...` only when certain; otherwise use a descriptive
-  `kg:` resource.
-- Use concise snake_case `kg:` predicates and resource names.
-- Use `rdf:type` for type relationships or `kg:is` for general “is” relationships.
-- Set `object_type` to `resource` for resource identifiers and `literal` for literal values.
-- A literal may have `language` or `datatype`, but not both.
-- Use `xsd:date`, `xsd:gYear`, or another supported `xsd:` identifier for typed literals.
-- Every triple must contain non-empty subject, predicate, object, and object_type strings.
+- Give every subject and object resource an rdfs:label using wording from the text and language en.
+- Use a reliable Wikidata QID as wd:Q... only when certain; otherwise use a descriptive kg: resource.
+- Use lowercase ASCII snake_case kg: resource names and predicates.
+- Use rdf:type for type relationships or kg:is for general "is" relationships.
+- Include at least one semantic relationship beyond labels.
+- Use language tags or datatypes for literals when appropriate, never both on the same literal.
+- Use valid Turtle punctuation and end each complete statement with a period.
 
 Example text:
-Alice manages a research laboratory in Lisbon.
+Nelson Mandela's presidential inauguration took place in Pretoria in 1994.
 
 Example response:
 {
-  "triples": [
-    {"subject":"kg:alice","predicate":"rdfs:label","object":"Alice","object_type":"literal","language":"en"},
-    {"subject":"kg:research_laboratory","predicate":"rdfs:label","object":"research laboratory","object_type":"literal","language":"en"},
-    {"subject":"wd:Q597","predicate":"rdfs:label","object":"Lisbon","object_type":"literal","language":"en"},
-    {"subject":"kg:alice","predicate":"kg:manages","object":"kg:research_laboratory","object_type":"resource"},
-    {"subject":"kg:research_laboratory","predicate":"kg:located_in","object":"wd:Q597","object_type":"resource"}
-  ]
+  "rdf": "@prefix kg: <https://example.org/wikidata-description/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\nkg:nelson_mandela rdfs:label \"Nelson Mandela\"@en ;\n    kg:participated_in kg:presidential_inauguration .\nkg:presidential_inauguration rdfs:label \"presidential inauguration\"@en ;\n    kg:took_place_in kg:pretoria ;\n    kg:year \"1994\"^^xsd:gYear .\nkg:pretoria rdfs:label \"Pretoria\"@en .\n"
+}
+
+Example text:
+OpenAI developed GPT-3, an artificial intelligence model for natural language processing.
+
+Example response:
+{
+  "rdf": "@prefix kg: <https://example.org/wikidata-description/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n\nkg:openai rdfs:label \"OpenAI\"@en ;\n    kg:developed kg:gpt_3 .\nkg:gpt_3 rdfs:label \"GPT-3\"@en ;\n    a kg:artificial_intelligence_model ;\n    kg:application_domain kg:natural_language_processing .\nkg:artificial_intelligence_model rdfs:label \"artificial intelligence model\"@en .\nkg:natural_language_processing rdfs:label \"natural language processing\"@en .\n"
+}
+
+Example text:
+Marie Curie and Pierre Curie discovered radium in Paris in 1898.
+
+Example response:
+{
+  "rdf": "@prefix kg: <https://example.org/wikidata-description/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n\nkg:radium_discovery rdfs:label \"discovery of radium\"@en ;\n    kg:discovered_by kg:marie_curie, kg:pierre_curie ;\n    kg:substance kg:radium ;\n    kg:took_place_in kg:paris ;\n    kg:year \"1898\"^^xsd:gYear .\nkg:marie_curie rdfs:label \"Marie Curie\"@en .\nkg:pierre_curie rdfs:label \"Pierre Curie\"@en .\nkg:radium rdfs:label \"radium\"@en .\nkg:paris rdfs:label \"Paris\"@en .\n"
 }
 
 Text:

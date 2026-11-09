@@ -18,4 +18,4 @@ class AnalyzeResponse:
     prompt: str
     input_text: str
     message_for_model: str
-    generation: dict[str, Any] | None = None
+    generation: dict[str, Any]

@@ -213,3 +213,7 @@ __marimo__/
 
 data/
 *.tex
+
+# Application logs
+/logs/
+.env
